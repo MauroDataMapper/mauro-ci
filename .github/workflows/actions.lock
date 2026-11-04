@@ -38,6 +38,7 @@ workflows:
         - 'actions/checkout@v6.1.0'
         - 'actions/setup-go@v6.5.0'
         - 'actions/setup-python@v6.3.0'
+    '.github/workflows/security-notify.yml': []
     '.github/workflows/verify-actions-lock.yml':
         - 'actions/checkout@v7.0.1'
     '.github/workflows/zulip-notify.yml':
