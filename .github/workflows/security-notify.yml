@@ -1,0 +1,91 @@
+
+name: Security Check Notifications
+
+on:
+    workflow_run:
+        workflows:
+            - Workflow Security Checks
+            - Verify Actions Lock
+        types:
+            - completed
+
+permissions: {}
+
+jobs:
+    notify:
+        # Only accept workflow runs originating from this repository.
+        if: >-
+            github.event.workflow_run.repository.full_name ==
+            github.repository
+
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+
+        steps:
+            - name: Send Zulip notification
+              shell: bash
+              env:
+                  ZULIP_API_KEY: ${{ secrets.ZULIP_API_KEY }}
+                  ZULIP_BOT_EMAIL: ${{ vars.ZULIP_BOT_EMAIL }}
+                  ZULIP_URL: https://maurodatamapper.zulipchat.com
+                  ZULIP_STREAM: build
+                  ZULIP_TOPIC: github-actions-security
+
+                  WORKFLOW: ${{ github.event.workflow_run.name }}
+                  CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+                  REPOSITORY: ${{ github.repository }}
+                  BRANCH: ${{ github.event.workflow_run.head_branch }}
+                  EVENT: ${{ github.event.workflow_run.event }}
+                  RUN_ID: ${{ github.event.workflow_run.id }}
+                  RUN_URL: ${{ github.event.workflow_run.html_url }}
+
+              run: |
+                  set -euo pipefail
+                  
+                  case "$CONCLUSION" in
+                    success)
+                      STATUS=":check_mark: PASSED"
+                      ;;
+                    failure)
+                      STATUS=":cross_mark: FAILED"
+                      ;;
+                    cancelled)
+                      STATUS=":warning: CANCELLED"
+                      ;;
+                    skipped)
+                      STATUS=":warning: SKIPPED"
+                      ;;
+                    timed_out)
+                      STATUS=":warning: TIMED OUT"
+                      ;;
+                    action_required)
+                      STATUS=":warning: ACTION REQUIRED"
+                      ;;
+                    *)
+                      STATUS=":warning: ${CONCLUSION:-UNKNOWN}"
+                      ;;
+                  esac
+                  
+                  MESSAGE="$STATUS
+                  **Repository:** $REPOSITORY
+                  **Workflow:** $WORKFLOW
+                  **Branch:** $BRANCH
+                  **Event:** $EVENT
+                  **Run ID:** $RUN_ID
+                  **Result:** $CONCLUSION
+                  [View GitHub Actions run]($RUN_URL)"
+                  
+                  curl \
+                    --fail-with-body \
+                    --silent \
+                    --show-error \
+                    --retry 3 \
+                    --connect-timeout 10 \
+                    --max-time 30 \
+                    --request POST \
+                    --user "$ZULIP_BOT_EMAIL:$ZULIP_API_KEY" \
+                    --data-urlencode "type=stream" \
+                    --data-urlencode "to=$ZULIP_STREAM" \
+                    --data-urlencode "topic=$ZULIP_TOPIC" \
+                    --data-urlencode "content=$MESSAGE" \
+                    "$ZULIP_URL/api/v1/messages"
