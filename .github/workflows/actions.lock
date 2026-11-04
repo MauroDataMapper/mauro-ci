@@ -30,7 +30,7 @@ workflows:
     '.github/workflows/megalinter.yml':
         - 'actions/checkout@v6.1.0'
         - 'actions/upload-artifact@v7.0.2'
-        - 'oxsecurity/megalinter@v9.6.0'
+        - 'oxsecurity/megalinter@v10.1.0'
     '.github/workflows/sarif-upload.yml':
         - 'actions/download-artifact@v7.0.0'
         - 'github/codeql-action@v3.39.2'
@@ -103,9 +103,9 @@ dependencies:
         commit: 'sha1-8da46b539cd8fe6ab27ca75128919a18d757604c'
         owner_id: 124156
         repo_id: 743626948
-    'oxsecurity/megalinter@v9.6.0':
-        ref: 'v9.6.0'
-        commit: 'sha1-ef3e84b8b836d76db562d0f3ed7da61e8fd538bc'
+    'oxsecurity/megalinter@v10.1.0':
+        ref: 'v10.1.0'
+        commit: 'sha1-9949bad031045f366be2467e00e8371a7328a2e2'
         owner_id: 89921661
         repo_id: 304830226
     'zulip/github-actions-zulip@v2.0.2':
