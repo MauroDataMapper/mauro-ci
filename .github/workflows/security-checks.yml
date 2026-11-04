@@ -51,4 +51,4 @@ jobs:
 
             - name: Audit workflows and actions
               run: |
-                  zizmor --strict-collection .
+                  zizmor --config .github/zizmor.yml --strict-collection .
