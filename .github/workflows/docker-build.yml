@@ -1,0 +1,42 @@
+name: Docker Build Validation
+
+on:
+    workflow_call:
+        inputs:
+            java-version:
+                type: string
+                default: "17"
+
+permissions: {}
+
+jobs:
+    docker-build:
+        runs-on: ubuntu-latest
+        timeout-minutes: 45
+
+        permissions:
+            contents: read
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6.1.0
+              with:
+                  persist-credentials: false
+
+            - name: Setup Java and Gradle
+              uses: $/actions/setup-gradle-java
+              with:
+                  java-version: ${{ inputs.java-version }}
+
+            - name: Setup Docker
+              uses: $/actions/setup-docker-buildx
+
+            - name: Build multi-architecture image
+              env:
+                  GRADLE_OPTS: >-
+                      -Xmx4g -XX:MaxMetaspaceSize=512m
+              run: |
+                  ./gradlew \
+                    --no-daemon \
+                    --max-workers=1 \
+                    dockerBuildMultiArch

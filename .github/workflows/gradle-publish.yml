@@ -1,0 +1,89 @@
+name: Gradle Publish
+
+on:
+    workflow_call:
+        inputs:
+            target:
+                type: string
+                required: true
+
+            java-version:
+                type: string
+                default: "17"
+
+        secrets:
+            SIGNING_KEY:
+                required: true
+            SIGNING_PASSWORD:
+                required: true
+            REPOSITORY_USERNAME:
+                required: true
+            REPOSITORY_PASSWORD:
+                required: true
+
+permissions: {}
+
+jobs:
+    publish:
+        if: >-
+            (inputs.target == 'snapshot' &&
+             github.event_name == 'push' &&
+             github.ref == 'refs/heads/develop') ||
+            (inputs.target == 'maven-central' &&
+             github.event_name == 'push' &&
+             github.ref == 'refs/heads/main')
+
+        runs-on: ubuntu-latest
+        timeout-minutes: 45
+
+        environment: ${{ inputs.target }}
+
+        permissions:
+            contents: read
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6.1.0
+              with:
+                  persist-credentials: false
+
+            - name: Setup Java and Gradle
+              uses: $/actions/setup-gradle-java
+              with:
+                  java-version: ${{ inputs.java-version }}
+
+            - name: Publish snapshot
+              if: inputs.target == 'snapshot'
+              env:
+                  GRADLE_OPTS: >-
+                      -Xmx4g -XX:MaxMetaspaceSize=512m
+                  ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+                  ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+                  ORG_GRADLE_PROJECT_MauroSnapshotRepositoryUsername: ${{ secrets.REPOSITORY_USERNAME }}
+                  ORG_GRADLE_PROJECT_MauroSnapshotRepositoryPassword: ${{ secrets.REPOSITORY_PASSWORD }}
+              run: |
+                  ./gradlew \
+                    --stacktrace \
+                    --no-daemon \
+                    --max-workers=1 \
+                    -PenableOpenApi=true \
+                    -PopenApiGeneratorMaxHeap=4g \
+                    publishAllPublicationsToMauroSnapshotRepositoryRepository
+
+            - name: Publish Maven Central
+              if: inputs.target == 'maven-central'
+              env:
+                  GRADLE_OPTS: >-
+                      -Xmx4g -XX:MaxMetaspaceSize=512m
+                  ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+                  ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+                  ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.REPOSITORY_USERNAME }}
+                  ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.REPOSITORY_PASSWORD }}
+              run: |
+                  ./gradlew \
+                    --stacktrace \
+                    --no-daemon \
+                    --max-workers=1 \
+                    -PenableOpenApi=true \
+                    -PopenApiGeneratorMaxHeap=4g \
+                    publishAllPublicationsToMavenCentralRepository

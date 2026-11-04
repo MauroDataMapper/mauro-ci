@@ -1,0 +1,44 @@
+name: Prepare MegaLinter
+description: Install the appropriate shared MegaLinter configuration
+
+inputs:
+    language:
+        description: Language to lint
+        required: true
+
+    scan-mode:
+        description: Changed files or full repository
+        required: true
+        default: changed
+
+runs:
+    using: composite
+    steps:
+        - name: Install MegaLinter configuration
+          shell: bash
+          env:
+              LANGUAGE: ${{ inputs.language }}
+              SCAN_MODE: ${{ inputs.scan-mode }}
+              ACTION_PATH: ${{ github.action_path }}
+          run: |
+              case "$LANGUAGE:$SCAN_MODE" in
+                groovy:changed)
+                  config="groovy-changed.yml"
+                  ;;
+                groovy:full)
+                  config="groovy-full.yml"
+                  ;;
+                typescript:changed)
+                  config="typescript-changed.yml"
+                  ;;
+                typescript:full)
+                  config="typescript-full.yml"
+                  ;;
+                *)
+                  echo "Unsupported MegaLinter configuration" >&2
+                  exit 1
+                  ;;
+              esac
+              
+              cp "$ACTION_PATH/config/$config" \
+                 "$GITHUB_WORKSPACE/.mega-linter.yml"

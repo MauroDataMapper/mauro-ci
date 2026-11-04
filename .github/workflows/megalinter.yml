@@ -1,0 +1,65 @@
+name: MegaLinter
+
+on:
+    workflow_call:
+        inputs:
+            language:
+                type: string
+                required: true
+
+            scan-mode:
+                type: string
+                default: changed
+
+permissions: {}
+
+jobs:
+    lint:
+        runs-on: ubuntu-latest
+
+        permissions:
+            contents: read
+
+        steps:
+            - name: Checkout consuming repository
+              uses: actions/checkout@v6.1.0
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - name: Install shared lint configuration
+              uses: $/actions/prepare-megalinter
+              with:
+                  language: ${{ inputs.language }}
+                  scan-mode: ${{ inputs.scan-mode }}
+
+            - name: Run MegaLinter for Groovy
+              if: inputs.language == 'groovy'
+              uses: oxsecurity/megalinter/flavors/java@v9.6.0
+              env:
+                  VALIDATE_ALL_CODEBASE: ${{ inputs.scan-mode == 'full' }}
+                  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+                  DISABLE_ERRORS: "true"
+                  SARIF_REPORTER: "true"
+
+            - name: Check SARIF output
+              if: always()
+              shell: bash
+              run: |
+                  if [[ -f megalinter-reports/megalinter-report.sarif ]]; then
+                    echo "SARIF report generated"
+                    ls -lh megalinter-reports/megalinter-report.sarif
+                  else
+                    echo "No SARIF report generated"
+                  fi
+
+            - name: Upload MegaLinter reports
+              if: always()
+              uses: actions/upload-artifact@v7.0.2
+              with:
+                  name: megalinter-reports
+                  path: |
+                      megalinter-reports/
+                      mega-linter.log
+                  retention-days: 7
+                  if-no-files-found: warn
