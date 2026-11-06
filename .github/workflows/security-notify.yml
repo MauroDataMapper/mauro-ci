@@ -49,43 +49,48 @@ jobs:
                   EVENT: ${{ github.event.workflow_run.event }}
                   ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
                   RUN_URL: ${{ github.event.workflow_run.html_url }}
+                  PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+                  HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name || github.repository }}
+                  SERVER_URL: ${{ github.server_url }}
 
               run: |
                   set -euo pipefail
+
+                  if [[ -n "$PR_NUMBER" ]]; then
+                    SOURCE_LINK="[View pull request]($SERVER_URL/$REPOSITORY/pull/$PR_NUMBER)"
+                  else
+                    SOURCE_LINK="[View commit]($SERVER_URL/$HEAD_REPOSITORY/commit/$COMMIT)"
+                  fi
                   
                   case "$CONCLUSION" in
                     success)
-                      STATUS=":check_mark: PASSED"
+                      STATUS=":check_mark: "
                       ;;
                     failure)
-                      STATUS=":cross_mark: FAILED"
+                      STATUS=":cross_mark: "
                       ;;
                     cancelled)
-                      STATUS=":warning: CANCELLED"
+                      STATUS=":warning: (CANCELLED)"
                       ;;
                     skipped)
-                      STATUS=":warning: SKIPPED"
+                      STATUS=":warning: (SKIPPED)"
                       ;;
                     timed_out)
-                      STATUS=":warning: TIMED OUT"
+                      STATUS=":warning: (TIMED OUT)"
                       ;;
                     action_required)
-                      STATUS=":warning: ACTION REQUIRED"
+                      STATUS=":warning: (ACTION REQUIRED)"
                       ;;
                     *)
-                      STATUS=":warning: ${CONCLUSION:-UNKNOWN}"
+                      STATUS=":warning: (${CONCLUSION:-UNKNOWN})"
                       ;;
                   esac
                   
-                  MESSAGE="$STATUS
-                  **Repository:** $REPOSITORY
-                  **Workflow:** $WORKFLOW
-                  **Branch:** $BRANCH
-                  **Actor:** $ACTOR
-                  **Event:** $EVENT
-                  **Commit:** ${COMMIT:0:12}
-                  **Attempt:** $ATTEMPT
-                  [View workflow run]($RUN_URL)"
+                  MESSAGE="$STATUS **$REPOSITORY** ($WORKFLOW)
+                  $BRANCH / $ACTOR ($EVENT)
+                  ${COMMIT:0:12} (Attempt $ATTEMPT)
+                  [View workflow run]($RUN_URL)
+                  [View commit]($SOURCE_LINK)"
                   
                   curl \
                     --fail-with-body \

@@ -55,6 +55,11 @@ jobs:
                   DOCKER_RESULT: ${{ inputs.docker-result }}
                   SNAPSHOT_RESULT: ${{ inputs.snapshot-result }}
                   MAVEN_RESULT: ${{ inputs.maven-result }}
+                  SERVER_URL: ${{ github.server_url }}
+                  REPOSITORY: ${{ github.repository }}
+                  HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+                  PR_NUMBER: ${{ github.event.pull_request.number }}
+                  COMMIT: ${{ github.sha }}
               run: |
                   set -euo pipefail
                   
@@ -74,6 +79,17 @@ jobs:
                     echo "status=SKIPPED" >> "$GITHUB_OUTPUT"
                   fi
 
+                  if [[ -n "$PR_NUMBER" ]]; then
+                    SOURCE_URL="$SERVER_URL/$REPOSITORY/pull/$PR_NUMBER"
+                    SOURCE_LABEL="View pull request"
+                  else
+                    SOURCE_URL="$SERVER_URL/$HEAD_REPOSITORY/commit/$COMMIT"
+                    SOURCE_LABEL="View commit"
+                  fi
+
+                  echo "source_url=$SOURCE_URL" >> "$GITHUB_OUTPUT"
+                  echo "source_label=$SOURCE_LABEL" >> "$GITHUB_OUTPUT"
+
             - name: Send Zulip notification
               uses: zulip/github-actions-zulip/send-message@v2.0.2
               with:
@@ -87,23 +103,12 @@ jobs:
                   content: >-
                       ${{ steps.status.outputs.icon }}
                       **${{ steps.status.outputs.status }}**
-                      — ${{ inputs.workflow-name }}
-                      
-                      **Repository:** ${{ github.repository }}
-                      
-                      **Branch / Merge:** ${{ github.head_ref || github.ref_name }}
-                      
-                      **Event:** ${{ github.event_name }}
-                      
-                      **Actor:** ${{ github.actor }}
-                      
-                      **Commit:** `${{ github.sha }}`
-                      
-                      **Results:**
-                      Build=${{ inputs.build-result }},
-                      Lint=${{ inputs.lint-result }},
-                      Docker=${{ inputs.docker-result }},
-                      Snapshot=${{ inputs.snapshot-result }},
-                      Maven=${{ inputs.maven-result }}
-                      
+                      **${{ github.repository }}** (${{ inputs.workflow-name }})
+
+                      ${{ github.head_ref || github.ref_name }} / ${{ github.actor }}
+                      (${{ github.event_name }})
+
+                      `${{ github.sha }}` (Attempt ${{ github.run_attempt }})
+
                       [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+                      [${{ steps.status.outputs.source_label }}](${{ steps.status.outputs.source_url }})
