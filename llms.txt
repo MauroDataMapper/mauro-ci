@@ -1,0 +1,34 @@
+# Mauro CI
+
+> Shared GitHub Actions workflows and composite actions for MauroDataMapper
+> repositories.
+
+## Start here
+
+- [README](README.md): repository purpose, contents, and basic reuse examples.
+- [Agent integration guidance](AGENTS.md): portable instructions for coding
+  agents integrating these workflows and actions into a consuming repository.
+
+## Reusable workflows
+
+- [Gradle test](.github/workflows/gradle-test.yml)
+- [Gradle publish](.github/workflows/gradle-publish.yml)
+- [Docker build validation](.github/workflows/docker-build.yml)
+- [Docker Hub publish](.github/workflows/docker-publish.yml)
+- [MegaLinter](.github/workflows/megalinter.yml)
+- [JUnit report](.github/workflows/junit-report.yml)
+- [SARIF upload](.github/workflows/sarif-upload.yml)
+- [Zulip notification](.github/workflows/zulip-notify.yml)
+
+## Composite actions
+
+- [Setup Java and Gradle](actions/setup-gradle-java/action.yml)
+- [Setup Docker Buildx](actions/setup-docker-buildx/action.yml)
+- [Prepare MegaLinter](actions/prepare-megalinter/action.yml)
+
+## Maintenance and security
+
+- [Workflow security checks](.github/workflows/security-checks.yml)
+- [Actions lock verification](.github/workflows/verify-actions-lock.yml)
+- [Actions lockfile](.github/workflows/actions.lock)
+- [Zizmor configuration](.github/zizmor.yml)
