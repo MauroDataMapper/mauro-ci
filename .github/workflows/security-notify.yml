@@ -21,17 +21,24 @@ jobs:
     notify:
         if: >-
             github.event.workflow_run.repository.full_name ==
-            github.repository
+            github.repository &&
+            contains(
+              fromJSON('["pull_request","push"]'),
+              github.event.workflow_run.event
+            )
 
         runs-on: ubuntu-latest
         timeout-minutes: 5
 
         steps:
-            - name: Send security notification
+            - name: Send security notification via Zulip
               shell: bash
               env:
                   ZULIP_API_KEY: ${{ secrets.ZULIP_API_KEY }}
-                  ZULIP_BOT_EMAIL: ${{ vars.ZULIP_BOT_EMAIL }}
+                  ZULIP_BOT_EMAIL: ${{ secrets.ZULIP_BOT_EMAIL }}
+                  ZULIP_URL: https://maurodatamapper.zulipchat.com
+                  ZULIP_STREAM: build/github-actions
+                  ZULIP_TOPIC: ${{github.repository}}
 
                   WORKFLOW: ${{ github.event.workflow_run.name }}
                   CONCLUSION: ${{ github.event.workflow_run.conclusion }}
@@ -47,15 +54,32 @@ jobs:
                   set -euo pipefail
                   
                   case "$CONCLUSION" in
-                    success)   STATUS=":check_mark: PASSED" ;;
-                    failure)   STATUS=":cross_mark: FAILED" ;;
-                    cancelled) STATUS=":warning: CANCELLED" ;;
-                    *)         STATUS=":warning: $CONCLUSION" ;;
+                    success)
+                      STATUS=":check_mark: PASSED"
+                      ;;
+                    failure)
+                      STATUS=":cross_mark: FAILED"
+                      ;;
+                    cancelled)
+                      STATUS=":warning: CANCELLED"
+                      ;;
+                    skipped)
+                      STATUS=":warning: SKIPPED"
+                      ;;
+                    timed_out)
+                      STATUS=":warning: TIMED OUT"
+                      ;;
+                    action_required)
+                      STATUS=":warning: ACTION REQUIRED"
+                      ;;
+                    *)
+                      STATUS=":warning: ${CONCLUSION:-UNKNOWN}"
+                      ;;
                   esac
                   
                   MESSAGE="$STATUS
-                  **Workflow:** $WORKFLOW
                   **Repository:** $REPOSITORY
+                  **Workflow:** $WORKFLOW
                   **Branch:** $BRANCH
                   **Actor:** $ACTOR
                   **Event:** $EVENT
@@ -72,7 +96,9 @@ jobs:
                     --max-time 30 \
                     --user "$ZULIP_BOT_EMAIL:$ZULIP_API_KEY" \
                     --data-urlencode "type=stream" \
-                    --data-urlencode "to=build" \
-                    --data-urlencode "topic=github-actions-security" \
+                    --data-urlencode "to=$ZULIP_STREAM" \
+                    --data-urlencode "topic=$ZULIP_TOPIC" \
                     --data-urlencode "content=$MESSAGE" \
                     https://maurodatamapper.zulipchat.com/api/v1/messages
+
+              continue-on-error: true
