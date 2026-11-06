@@ -27,7 +27,7 @@ jobs:
 
         steps:
             - name: Checkout consuming repository
-              uses: actions/checkout@v6.1.0
+              uses: actions/checkout@v7.0.1
               with:
                   fetch-depth: 0
                   persist-credentials: false
