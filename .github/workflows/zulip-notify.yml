@@ -1,49 +1,41 @@
+
 name: Zulip Notify
 
 on:
     workflow_call:
         inputs:
+            build-result:
+                description: Build/test job result
+                type: string
+                default: skipped
+
+            lint-result:
+                description: Lint job result
+                type: string
+                default: skipped
+
+            docker-result:
+                description: Docker build/publish result
+                type: string
+                default: skipped
+
+            snapshot-result:
+                description: Snapshot publication result
+                type: string
+                default: skipped
+
+            maven-result:
+                description: Maven Central publication result
+                type: string
+                default: skipped
+
             workflow-name:
+                description: Name of the calling workflow
                 type: string
-                required: true
-            conclusion:
-                type: string
-                required: true
-            run-url:
-                type: string
-                required: true
-            run-id:
-                type: string
-                default: ""
-            run-attempt:
-                type: string
-                default: "1"
-            repository:
-                type: string
-                default: ""
-            branch:
-                type: string
-                default: ""
-            commit:
-                type: string
-                default: ""
-            actor:
-                type: string
-                default: ""
-            event-name:
-                type: string
-                default: ""
-            started-at:
-                type: string
-                default: ""
-            pr-number:
-                type: string
-                default: ""
+                default: CI
 
         secrets:
             ZULIP_API_KEY:
-                required: true
-            ZULIP_BOT_EMAIL:
                 required: true
 
 permissions: {}
@@ -53,37 +45,65 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 5
 
-        permissions:
-            actions: read
-
         steps:
-            - name: Fetch failed jobs
-              id: jobs
+            - name: Determine overall result
+              id: status
               shell: bash
               env:
-                  GH_TOKEN: ${{ github.token }}
-                  REPOSITORY: ${{ inputs.repository }}
-                  RUN_ID: ${{ inputs.run-id }}
-                  RUN_ATTEMPT: ${{ inputs.run-attempt }}
+                  BUILD_RESULT: ${{ inputs.build-result }}
+                  LINT_RESULT: ${{ inputs.lint-result }}
+                  DOCKER_RESULT: ${{ inputs.docker-result }}
+                  SNAPSHOT_RESULT: ${{ inputs.snapshot-result }}
+                  MAVEN_RESULT: ${{ inputs.maven-result }}
               run: |
                   set -euo pipefail
                   
-                  if [[ -z "$RUN_ID" || -z "$REPOSITORY" ]]; then
-                    echo 'failed_jobs=[]' >> "$GITHUB_OUTPUT"
-                    exit 0
-                  fi
+                  results="$BUILD_RESULT $LINT_RESULT $DOCKER_RESULT $SNAPSHOT_RESULT $MAVEN_RESULT"
                   
-                  # Fetch jobs for this particular run attempt.
-                  if ! jobs=$(gh api \
-                    "repos/$REPOSITORY/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT/jobs" \
-                    --paginate \
-                    --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out") | .name'); then
-                    echo "::warning::Could not retrieve failed job names"
-                    jobs=""
+                  if [[ " $results " == *" failure "* ]]; then
+                    echo "icon=:cross_mark:" >> "$GITHUB_OUTPUT"
+                    echo "status=FAILED" >> "$GITHUB_OUTPUT"
+                  elif [[ " $results " == *" cancelled "* ]]; then
+                    echo "icon=:warning:" >> "$GITHUB_OUTPUT"
+                    echo "status=CANCELLED" >> "$GITHUB_OUTPUT"
+                  elif [[ " $results " == *" success "* ]]; then
+                    echo "icon=:check_mark:" >> "$GITHUB_OUTPUT"
+                    echo "status=PASSED" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "icon=:warning:" >> "$GITHUB_OUTPUT"
+                    echo "status=SKIPPED" >> "$GITHUB_OUTPUT"
                   fi
-                  
-                  {
-                    echo 'failed_jobs<<EOF'
-                    printf '%s\n' "$jobs"
-                    echo 'EOF'
-                  } >> "$GITHUB_OUTPUT"
+
+            - name: Send Zulip notification
+              uses: zulip/github-actions-zulip/send-message@v2.0.2
+              with:
+                  api-key: ${{ secrets.ZULIP_API_KEY }}
+                  email: githubactionsbot-bot@maurodatamapper.zulipchat.com
+                  organization-url: https://maurodatamapper.zulipchat.com
+                  to: build/github-actions
+                  type: stream
+                  topic: ${{ github.repository }}
+
+                  content: >-
+                      ${{ steps.status.outputs.icon }}
+                      **${{ steps.status.outputs.status }}**
+                      — ${{ inputs.workflow-name }}
+                      
+                      **Repository:** ${{ github.repository }}
+                      
+                      **Branch / Merge:** ${{ github.head_ref || github.ref_name }}
+                      
+                      **Event:** ${{ github.event_name }}
+                      
+                      **Actor:** ${{ github.actor }}
+                      
+                      **Commit:** `${{ github.sha }}`
+                      
+                      **Results:**
+                      Build=${{ inputs.build-result }},
+                      Lint=${{ inputs.lint-result }},
+                      Docker=${{ inputs.docker-result }},
+                      Snapshot=${{ inputs.snapshot-result }},
+                      Maven=${{ inputs.maven-result }}
+                      
+                      [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
