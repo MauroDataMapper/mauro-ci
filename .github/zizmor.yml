@@ -5,4 +5,4 @@ rules:
                 "*": ref-pin
     dangerous-triggers:
         ignore:
-            - .github/workflows/security-notify.yml
+            - security-notify.yml

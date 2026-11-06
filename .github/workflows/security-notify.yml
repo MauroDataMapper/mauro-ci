@@ -40,7 +40,7 @@ jobs:
                   ZULIP_TOPIC: ${{github.repository}}
 
                   WORKFLOW: ${{ github.workflow }}
-                  CONCLUSION: ${{ inputs.conclusion }}
+                  CONCLUSION: ${{ github.event.workflow_run.conclusion }}
                   REPOSITORY: ${{ github.repository }}
                   BRANCH: ${{ github.head_ref || github.ref_name }}
                   EVENT: ${{ github.event_name }}
