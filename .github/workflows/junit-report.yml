@@ -37,7 +37,7 @@ jobs:
                   persist-credentials: false
 
             - name: Download JUnit results
-              uses: actions/download-artifact@v7.0.0
+              uses: actions/download-artifact@v8.0.2
               with:
                   name: ${{ inputs.artifact-name }}
                   path: junit-results
