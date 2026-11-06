@@ -90,7 +90,7 @@ jobs:
                   $BRANCH / $ACTOR ($EVENT)
                   ${COMMIT:0:12} (Attempt $ATTEMPT)
                   [View workflow run]($RUN_URL)
-                  [View commit]($SOURCE_LINK)"
+                  $SOURCE_LINK"
                   
                   curl \
                     --fail-with-body \
