@@ -37,7 +37,7 @@ workflows:
         - 'github/codeql-action@v4.39.1'
     '.github/workflows/security-checks.yml':
         - 'actions/checkout@v6.1.0'
-        - 'actions/setup-go@v6.5.0'
+        - 'actions/setup-go@v7.0.0'
         - 'actions/setup-python@v6.3.0'
     '.github/workflows/security-notify.yml': []
     '.github/workflows/verify-actions-lock.yml':
@@ -60,9 +60,9 @@ dependencies:
         commit: 'sha1-9000827ccba6bdab643e8b6fd33ac0654aef8333'
         owner_id: 44036562
         repo_id: 192626254
-    'actions/setup-go@v6.5.0':
-        ref: 'v6.5.0'
-        commit: 'sha1-924ae3a1cded613372ab5595356fb5720e22ba16'
+    'actions/setup-go@v7.0.0':
+        ref: 'v7.0.0'
+        commit: 'sha1-b7ad1dad31e06c5925ef5d2fc7ad053ef454303e'
         owner_id: 44036562
         repo_id: 192624594
     'actions/setup-java@v5.7.0':
