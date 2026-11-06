@@ -8,7 +8,7 @@
 name: Security Check Notifications
 
 on:
-    workflow_run:
+    workflow_run: # zizmor: ignore[dangerous-triggers]
         workflows:
             - Workflow Security Checks
             - Verify Actions Lock
@@ -21,73 +21,47 @@ jobs:
     notify:
         if: >-
             github.event.workflow_run.repository.full_name ==
-            github.repository &&
-            contains(
-              fromJSON('["pull_request","push"]'),
-              github.event.workflow_run.event
-            )
+            github.repository
+
         runs-on: ubuntu-latest
         timeout-minutes: 5
 
         steps:
-            - name: Send Zulip notification
+            - name: Send security notification
               shell: bash
               env:
                   ZULIP_API_KEY: ${{ secrets.ZULIP_API_KEY }}
-                  ZULIP_BOT_EMAIL: ${{ secrets.ZULIP_BOT_EMAIL }}
-                  ZULIP_URL: https://maurodatamapper.zulipchat.com
-                  ZULIP_STREAM: build/github-actions
-                  ZULIP_TOPIC: ${{github.repository}}
+                  ZULIP_BOT_EMAIL: ${{ vars.ZULIP_BOT_EMAIL }}
 
-                  WORKFLOW: ${{ github.workflow }}
+                  WORKFLOW: ${{ github.event.workflow_run.name }}
                   CONCLUSION: ${{ github.event.workflow_run.conclusion }}
                   REPOSITORY: ${{ github.repository }}
-                  BRANCH: ${{ github.head_ref || github.ref_name }}
-                  EVENT: ${{ github.event_name }}
-                  RUN_ID: ${{ github.run_id }}
-                  RUN_URL: >-
-                      ${{ format(
-                          '{0}/{1}/actions/runs/{2}',
-                          github.server_url,
-                          github.repository,
-                          github.run_id
-                      ) }}
+                  BRANCH: ${{ github.event.workflow_run.head_branch }}
+                  ACTOR: ${{ github.event.workflow_run.actor.login }}
+                  COMMIT: ${{ github.event.workflow_run.head_sha }}
+                  EVENT: ${{ github.event.workflow_run.event }}
+                  ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+                  RUN_URL: ${{ github.event.workflow_run.html_url }}
 
               run: |
                   set -euo pipefail
                   
                   case "$CONCLUSION" in
-                    success)
-                      STATUS=":check_mark: PASSED"
-                      ;;
-                    failure)
-                      STATUS=":cross_mark: FAILED"
-                      ;;
-                    cancelled)
-                      STATUS=":warning: CANCELLED"
-                      ;;
-                    skipped)
-                      STATUS=":warning: SKIPPED"
-                      ;;
-                    timed_out)
-                      STATUS=":warning: TIMED OUT"
-                      ;;
-                    action_required)
-                      STATUS=":warning: ACTION REQUIRED"
-                      ;;
-                    *)
-                      STATUS=":warning: ${CONCLUSION:-UNKNOWN}"
-                      ;;
+                    success)   STATUS=":check_mark: PASSED" ;;
+                    failure)   STATUS=":cross_mark: FAILED" ;;
+                    cancelled) STATUS=":warning: CANCELLED" ;;
+                    *)         STATUS=":warning: $CONCLUSION" ;;
                   esac
                   
                   MESSAGE="$STATUS
-                  **Repository:** $REPOSITORY
                   **Workflow:** $WORKFLOW
+                  **Repository:** $REPOSITORY
                   **Branch:** $BRANCH
+                  **Actor:** $ACTOR
                   **Event:** $EVENT
-                  **Run ID:** $RUN_ID
-                  **Result:** $CONCLUSION
-                  [View GitHub Actions run]($RUN_URL)"
+                  **Commit:** ${COMMIT:0:12}
+                  **Attempt:** $ATTEMPT
+                  [View workflow run]($RUN_URL)"
                   
                   curl \
                     --fail-with-body \
@@ -96,11 +70,9 @@ jobs:
                     --retry 3 \
                     --connect-timeout 10 \
                     --max-time 30 \
-                    --request POST \
                     --user "$ZULIP_BOT_EMAIL:$ZULIP_API_KEY" \
                     --data-urlencode "type=stream" \
-                    --data-urlencode "to=$ZULIP_STREAM" \
-                    --data-urlencode "topic=$ZULIP_TOPIC" \
+                    --data-urlencode "to=build" \
+                    --data-urlencode "topic=github-actions-security" \
                     --data-urlencode "content=$MESSAGE" \
-                    "$ZULIP_URL/api/v1/messages"
-              continue-on-error: true
+                    https://maurodatamapper.zulipchat.com/api/v1/messages

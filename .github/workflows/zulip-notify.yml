@@ -1,26 +1,49 @@
-name: Zulip Notification
+name: Zulip Notify
 
 on:
     workflow_call:
         inputs:
-            build-result:
+            workflow-name:
                 type: string
                 required: true
-
-            snapshot-result:
+            conclusion:
                 type: string
-                default: skipped
-
-            maven-result:
+                required: true
+            run-url:
                 type: string
-                default: skipped
-
-            docker-result:
+                required: true
+            run-id:
                 type: string
-                default: skipped
+                default: ""
+            run-attempt:
+                type: string
+                default: "1"
+            repository:
+                type: string
+                default: ""
+            branch:
+                type: string
+                default: ""
+            commit:
+                type: string
+                default: ""
+            actor:
+                type: string
+                default: ""
+            event-name:
+                type: string
+                default: ""
+            started-at:
+                type: string
+                default: ""
+            pr-number:
+                type: string
+                default: ""
 
         secrets:
             ZULIP_API_KEY:
+                required: true
+            ZULIP_BOT_EMAIL:
                 required: true
 
 permissions: {}
@@ -30,24 +53,37 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 5
 
-        steps:
-            - name: Send Zulip notification
-              uses: zulip/github-actions-zulip/send-message@v2.0.2
-              with:
-                  api-key: ${{ secrets.ZULIP_API_KEY }}
-                  email: githubactionsbot-bot@maurodatamapper.zulipchat.com
-                  organization-url: https://maurodatamapper.zulipchat.com
-                  to: build/github-actions
-                  type: stream
-                  topic: ${{ github.repository }}
+        permissions:
+            actions: read
 
-                  content: >-
-                      Build results for ${{ github.repository }}
-                      on ${{ github.ref }}:
-                      
-                      Build: ${{ inputs.build-result }}
-                      Snapshot: ${{ inputs.snapshot-result }}
-                      Maven Central: ${{ inputs.maven-result }}
-                      Docker: ${{ inputs.docker-result }}
-                      
-                      ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        steps:
+            - name: Fetch failed jobs
+              id: jobs
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  REPOSITORY: ${{ inputs.repository }}
+                  RUN_ID: ${{ inputs.run-id }}
+                  RUN_ATTEMPT: ${{ inputs.run-attempt }}
+              run: |
+                  set -euo pipefail
+                  
+                  if [[ -z "$RUN_ID" || -z "$REPOSITORY" ]]; then
+                    echo 'failed_jobs=[]' >> "$GITHUB_OUTPUT"
+                    exit 0
+                  fi
+                  
+                  # Fetch jobs for this particular run attempt.
+                  if ! jobs=$(gh api \
+                    "repos/$REPOSITORY/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT/jobs" \
+                    --paginate \
+                    --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out") | .name'); then
+                    echo "::warning::Could not retrieve failed job names"
+                    jobs=""
+                  fi
+                  
+                  {
+                    echo 'failed_jobs<<EOF'
+                    printf '%s\n' "$jobs"
+                    echo 'EOF'
+                  } >> "$GITHUB_OUTPUT"
