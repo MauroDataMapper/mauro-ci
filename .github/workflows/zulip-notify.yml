@@ -101,8 +101,7 @@ jobs:
                   topic: ${{ github.repository }}
 
                   content: >-
-                      ${{ steps.status.outputs.icon }}
-                      **${{ steps.status.outputs.status }}**
+                      ${{ steps.status.outputs.icon }} 
                       **${{ github.repository }}** (${{ inputs.workflow-name }})
 
                       ${{ github.head_ref || github.ref_name }} / ${{ github.actor }}
@@ -111,4 +110,5 @@ jobs:
                       `${{ github.sha }}` (Attempt ${{ github.run_attempt }})
 
                       [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+                      
                       [${{ steps.status.outputs.source_label }}](${{ steps.status.outputs.source_url }})
