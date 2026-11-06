@@ -1,28 +1,31 @@
+# SECURITY:
+# This workflow intentionally uses workflow_run.
+# It does not checkout code or download artifacts from the triggering run.
+# It only reads workflow_run metadata and sends a Zulip notification.
+# It has no GITHUB_TOKEN permissions.
+# Review carefully before adding any steps or dependencies.
 
 name: Security Check Notifications
 
 on:
-    workflow_call:
-        inputs:
-            conclusion:
-                type: string
-                required: true
-
-        secrets:
-            ZULIP_API_KEY:
-                required: true
-            ZULIP_BOT_EMAIL:
-                required: true
+    workflow_run:
+        workflows:
+            - Workflow Security Checks
+            - Verify Actions Lock
+        types:
+            - completed
 
 permissions: {}
 
 jobs:
     notify:
-        # Only accept workflow runs originating from this repository.
         if: >-
             github.event.workflow_run.repository.full_name ==
-            github.repository
-
+            github.repository &&
+            contains(
+              fromJSON('["pull_request","push"]'),
+              github.event.workflow_run.event
+            )
         runs-on: ubuntu-latest
         timeout-minutes: 5
 
