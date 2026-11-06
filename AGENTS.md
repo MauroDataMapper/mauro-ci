@@ -26,7 +26,7 @@ secrets, permissions, and behavior.
 | Publish Gradle artifacts | `.github/workflows/gradle-publish.yml` | `target: snapshot` only publishes on `develop`; `target: maven-central` only publishes on `main`. Pass signing and repository secrets. |
 | Validate a Docker build | `.github/workflows/docker-build.yml` | Builds a multi-architecture image without publishing it. |
 | Publish to Docker Hub | `.github/workflows/docker-publish.yml` | Publishes only on pushes to `main`; pass Docker Hub credentials. |
-| Lint with MegaLinter | `.github/workflows/megalinter.yml` | The checked-in workflow/configuration supports Groovy. `scan-mode` is `changed` by default or can be `full`; it uploads `megalinter-reports`. |
+| Lint with MegaLinter | `.github/workflows/megalinter.yml` | The checked-in workflow/configuration supports Groovy. `scan-mode` is `changed` by default or can be `full`; it uploads `megalinter-reports`. Set `scan-pr-commits: true` to enable Gitleaks scanning between PR base and head commits. |
 | Publish JUnit results | `.github/workflows/junit-report.yml` | Expects the `junit-results` artifact and only runs for same-repository pull requests or pushes to `main`/`develop`. |
 | Upload SARIF | `.github/workflows/sarif-upload.yml` | Expects `megalinter-reports` and only uploads on pushes to `main`/`develop`. |
 | Send a Zulip summary | `.github/workflows/zulip-notify.yml` | Pass job results and `ZULIP_API_KEY`; use `if: always()` if it must run after failed or cancelled jobs. |

@@ -22,7 +22,7 @@ Call these from a workflow in another repository using a job-level `uses`.
 | `gradle-publish.yml` | Publishes snapshots from `develop` or Maven Central releases from `main`. Requires signing and repository credentials. |
 | `docker-build.yml` | Validates a multi-architecture Docker build without publishing it. |
 | `docker-publish.yml` | Publishes the Docker image to Docker Hub on pushes to `main`. Requires Docker Hub credentials. |
-| `megalinter.yml` | Prepares shared MegaLinter configuration, runs the configured lint workflow, and uploads reports. The checked-in configurations currently cover Groovy scans in changed-files or full-repository mode. |
+| `megalinter.yml` | Prepares shared MegaLinter configuration, runs the configured lint workflow, and uploads reports. The checked-in configurations currently cover Groovy scans in changed-files or full-repository mode. The optional `scan-pr-commits` input enables Gitleaks PR commit-range scanning. |
 | `junit-report.yml` | Publishes a JUnit report from the `junit-results` artifact, subject to its event and repository checks. |
 | `sarif-upload.yml` | Uploads a MegaLinter SARIF artifact to GitHub code scanning on pushes to `main` or `develop`. |
 | `zulip-notify.yml` | Sends a compact Zulip message summarizing build, lint, Docker, and publishing results. Requires `ZULIP_API_KEY`. |

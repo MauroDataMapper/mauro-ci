@@ -11,6 +11,11 @@ on:
                 type: string
                 default: changed
 
+            scan-pr-commits:
+                description: Scan all commits between the pull request base and head for secrets
+                type: boolean
+                default: false
+
 permissions: {}
 
 jobs:
@@ -41,6 +46,11 @@ jobs:
                   DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
                   DISABLE_ERRORS: "true"
                   SARIF_REPORTER: "true"
+                  PULL_REQUEST: ${{ inputs.scan-pr-commits && github.event_name == 'pull_request' }}
+                  REPOSITORY_GITLEAKS_PR_COMMITS_SCAN: ${{ inputs.scan-pr-commits && github.event_name == 'pull_request' }}
+                  REPOSITORY_GITLEAKS_PR_SOURCE_SHA: ${{ inputs.scan-pr-commits && github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+                  REPOSITORY_GITLEAKS_PR_TARGET_SHA: ${{ inputs.scan-pr-commits && github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+                  GITHUB_TOKEN: ${{ inputs.scan-pr-commits && github.event_name == 'pull_request' && github.token || '' }}
 
             - name: Check SARIF output
               if: always()
