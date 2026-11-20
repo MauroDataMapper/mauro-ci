@@ -30,6 +30,7 @@
 - [Run an npm script](actions/run-npm-script/action.yml)
 - [Check license headers](actions/check-license-headers/action.yml)
 - [Upload JUnit results](actions/upload-junit-results/action.yml)
+- [Verify Node.js environment](actions/verify-node-environment/action.yml)
 - [Setup Docker Buildx](actions/setup-docker-buildx/action.yml)
 - [Prepare MegaLinter](actions/prepare-megalinter/action.yml)
 

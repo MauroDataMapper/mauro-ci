@@ -38,10 +38,11 @@ support this repository's own workflow validation and security notifications.
 | --- | --- |
 | `actions/setup-gradle-java` | Configures a Temurin JDK and Gradle. Accepts a Java version. |
 | `actions/link-npm-package` | Checks out a public npm package, installs/builds it, and links it into the consuming project. |
-| `actions/setup-node-npm` | Configures Node.js/npm, caches npm dependencies, and runs `npm ci` from a lockfile. |
+| `actions/setup-node-npm` | Configures Node.js/npm, caches npm dependencies, and runs `npm ci` from the project's lockfile. |
 | `actions/run-npm-script` | Runs a named npm script with an optional single argument; use for tests, license checks, lint, or builds. |
 | `actions/check-license-headers` | Runs the configured npm license-header check, defaulting to `license-check check`. |
 | `actions/upload-junit-results` | Uploads JUnit XML as a workflow artifact and exposes its artifact ID. |
+| `actions/verify-node-environment` | Checks local tool versions and installed dependencies, and optionally reports npm-linked packages. |
 | `actions/setup-docker-buildx` | Configures QEMU and Docker Buildx for multi-architecture builds. |
 | `actions/prepare-megalinter` | Copies the shared MegaLinter configuration into the consuming workspace. Supports the checked-in Groovy changed-files and full-repository configurations. |
 
@@ -96,17 +97,21 @@ consuming repository:
 
 `node-ci.yml` checks out the consuming repository with checkout credentials
 disabled, grants only `contents: read`, and runs `npm ci` without secrets. Set
-`test-script` to a script in `package.json`; lint, license, and build scripts
-are optional. Report and build artifact paths are relative to the repository
-root. The workflow uploads test and lint reports as `unit-junit-results` and
-`lint-junit-results`, SARIF as `sarif-results`, and the build output under
-`build-artifact-name` (default `node-build`).
+exactly one of `test-script` or `test-executable`; the latter accepts
+whitespace-separated `test-arguments` for commands such as `npx jest
+--coverage`. Lint, license, SARIF-generation, and build scripts are optional.
+Tool/dependency verification and npm-link reporting can be enabled with the
+`verify-*` inputs. Report and build artifact paths are relative to the
+repository root. The workflow uploads test and lint reports as
+`unit-junit-results` and `lint-junit-results`, SARIF as `sarif-results`, and
+the build output under `build-artifact-name` (default `node-build`).
 
 For projects that need custom setup between dependency installation and tests,
 use `actions/setup-node-npm` in a job of your own, then run the project-specific
 steps. It accepts `node-version`, `working-directory`, and
-`cache-dependency-path`, and uses the npm version bundled with Node.js. To link
-a separate public npm package in that job,
+`cache-dependency-path` and uses the npm version bundled with Node.js. Install
+additional tools as lockfile-managed project dependencies rather than globally.
+To link a separate public npm package in that job,
 use `actions/link-npm-package` or set the corresponding `linked-package-*`
 inputs on `node-ci.yml`. The package's install and build scripts run as code;
 do not use this with secrets in the job.
@@ -138,6 +143,27 @@ JUnit XML; its `artifact-id` output can be used to guard a report job:
     path: test-report/junit.xml
 ```
 
+Use `actions/verify-node-environment` after setup and any local-package linking
+to report selected tool versions, verify installed packages with `npm ls`, and
+optionally report linked package names. When enabling that option, include the
+`symlinked` CLI in the project's lockfile-managed dependencies:
+
+```yaml
+- uses: MauroDataMapper/mauro-ci/actions/verify-node-environment@<ref>
+  with:
+    working-directory: mdm-ui
+    tools: |
+      tsc
+      jest
+    dependencies: |
+      jsdom
+      jest
+      ts-jest
+      @angular/core
+      symlinked
+    report-symlinked-names: true
+```
+
 The shared reporting and publishing workflows can consume the artifacts:
 
 ```yaml
@@ -156,9 +182,24 @@ jobs:
       linked-package-path: mdm-resources
       linked-package-name: "@maurodatamapper/mdm-resources"
       linked-package-use-npm-ci: false
-      test-script: test-with-coverage
+      verify-tools: |
+        tsc
+        jest
+      verify-dependencies: |
+        jsdom
+        jest
+        ts-jest
+        @angular/core
+        symlinked
+      report-symlinked-names: true
+      test-executable: npx
+      test-arguments: jest --coverage
+      license-script: license-check
+      license-argument: check
       lint-script: eslint-nofix
       lint-continue-on-error: true
+      sarif-script: eslint-sarif
+      sarif-continue-on-error: true
       build-script: dist
       test-junit-path: test-report/junit.xml
       lint-junit-path: eslint/eslint-junit.xml

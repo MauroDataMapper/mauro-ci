@@ -25,12 +25,13 @@ secrets, permissions, and behavior.
 | --- | --- | --- |
 | Run Gradle tests | `.github/workflows/gradle-test.yml` | Checks out the consuming repository, defaults to Java 17 and the `test` task, and uploads `junit-results`. |
 | Publish Gradle artifacts | `.github/workflows/gradle-publish.yml` | `target: snapshot` only publishes on `develop`; `target: maven-central` only publishes on `main`. Pass signing and repository secrets. |
-| Run Node.js CI | `.github/workflows/node-ci.yml` | Runs `npm ci` and named npm scripts with no secrets and `contents: read`; report and build artifact paths are relative to the repository root. |
-| Set up Node.js in a custom job | `actions/setup-node-npm` | Configures Node.js/npm and installs the lockfile dependencies; use when a repository needs project-specific setup steps in the same job. |
+| Run Node.js CI | `.github/workflows/node-ci.yml` | Sets up npm, verifies optional tools/dependencies, runs tests from an npm script or executable, and uploads reports/build artifacts without secrets and with `contents: read`. |
+| Set up Node.js in a custom job | `actions/setup-node-npm` | Configures Node.js/npm and installs dependencies with `npm ci` from the lockfile. |
 | Link a local npm dependency | `actions/link-npm-package` | Checks out and runs install/build scripts for a public dependency; use only in jobs without secrets. |
 | Run an npm script | `actions/run-npm-script` | Runs a named script after dependencies are installed; supports an optional single argument and working directory. Use for tests, license checks, lint, or builds. |
 | Check license headers | `actions/check-license-headers` | Runs a configurable npm license-check script; defaults to `license-check check`. |
 | Upload JUnit XML | `actions/upload-junit-results` | Uploads a JUnit file as an artifact and exposes its artifact ID; call with `if: always()` to upload after a failed test step. |
+| Verify Node.js setup | `actions/verify-node-environment` | Reports local tool versions, checks installed packages, and optionally reports npm-linked package names. |
 | Publish Node.js artifacts | `.github/workflows/node-publish.yml` | Downloads an artifact without checking out or running repository code; publishes snapshots only on `main`/`develop` pushes and optional releases on `main`, using a required caller-configured environment for protection rules. |
 | Validate a Docker build | `.github/workflows/docker-build.yml` | Builds a multi-architecture image without publishing it. |
 | Publish to Docker Hub | `.github/workflows/docker-publish.yml` | Publishes only on pushes to `main`; pass Docker Hub credentials. |
@@ -123,6 +124,10 @@ statuses it reports and ensure it is not skipped after failures:
   does not check out or execute repository code, and binds publishing to the
   caller-configured environment. Configure protection rules and credentials in
   that environment, or explicitly map repository credentials.
+- `node-ci.yml` can run one `test-script` or one `test-executable`; its
+  executable arguments are whitespace-separated. Install tools through the
+  consuming repository's lockfile, and keep test/build inputs secretless
+  because the workflow executes consuming-repository code.
 - JUnit and SARIF reporting consume artifacts produced earlier in the same
   workflow run. Preserve the expected artifact names or pass the corresponding
   input when a workflow supports one.

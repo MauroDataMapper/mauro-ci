@@ -45,6 +45,21 @@ on:
                 type: boolean
                 default: true
 
+            verify-tools:
+                description: Newline-separated local executables to report versions for
+                type: string
+                default: ""
+
+            verify-dependencies:
+                description: Newline-separated npm dependencies to verify with npm ls
+                type: string
+                default: ""
+
+            report-symlinked-names:
+                description: Report npm-linked package names after linking dependencies
+                type: boolean
+                default: false
+
             license-script:
                 description: Optional npm script to run before tests
                 type: string
@@ -56,9 +71,19 @@ on:
                 default: ""
 
             test-script:
-                description: npm script to run for tests
+                description: npm script to run for tests (mutually exclusive with test-executable)
                 type: string
-                required: true
+                default: ""
+
+            test-executable:
+                description: Optional executable to run for tests instead of an npm script
+                type: string
+                default: ""
+
+            test-arguments:
+                description: Whitespace-separated arguments for test-executable
+                type: string
+                default: ""
 
             lint-script:
                 description: Optional npm script to run for linting
@@ -69,6 +94,16 @@ on:
                 description: Keep the workflow successful when the lint script fails
                 type: boolean
                 default: false
+
+            sarif-script:
+                description: Optional npm script to generate SARIF
+                type: string
+                default: ""
+
+            sarif-continue-on-error:
+                description: Keep the workflow successful when SARIF generation fails
+                type: boolean
+                default: true
 
             build-script:
                 description: Optional npm script to build the project
@@ -156,6 +191,18 @@ jobs:
                   build-script: ${{ inputs.linked-package-build-script }}
                   use-npm-ci: ${{ inputs.linked-package-use-npm-ci }}
 
+            - name: Verify Node.js environment
+              if: >-
+                  inputs.verify-tools != '' ||
+                  inputs.verify-dependencies != '' ||
+                  inputs.report-symlinked-names
+              uses: $/actions/verify-node-environment
+              with:
+                  working-directory: ${{ inputs.working-directory }}
+                  tools: ${{ inputs.verify-tools }}
+                  dependencies: ${{ inputs.verify-dependencies }}
+                  report-symlinked-names: ${{ inputs.report-symlinked-names }}
+
             - name: Run license check
               if: inputs.license-script != ''
               uses: $/actions/check-license-headers
@@ -164,11 +211,52 @@ jobs:
                   license-argument: ${{ inputs.license-argument }}
                   working-directory: ${{ inputs.working-directory }}
 
-            - name: Run tests
+            - name: Validate test configuration
+              shell: bash
+              env:
+                  TEST_SCRIPT: ${{ inputs.test-script }}
+                  TEST_EXECUTABLE: ${{ inputs.test-executable }}
+                  TEST_ARGUMENTS: ${{ inputs.test-arguments }}
+              run: |
+                  set -euo pipefail
+                  if [[ -z "$TEST_SCRIPT" && -z "$TEST_EXECUTABLE" ]]; then
+                    echo "Set either test-script or test-executable" >&2
+                    exit 1
+                  fi
+                  if [[ -n "$TEST_SCRIPT" && -n "$TEST_EXECUTABLE" ]]; then
+                    echo "Set only one of test-script or test-executable" >&2
+                    exit 1
+                  fi
+                  if [[ -n "$TEST_ARGUMENTS" && -z "$TEST_EXECUTABLE" ]]; then
+                    echo "test-arguments requires test-executable" >&2
+                    exit 1
+                  fi
+                  if [[ -n "$TEST_EXECUTABLE" && ! "$TEST_EXECUTABLE" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+                    echo "Invalid test-executable name" >&2
+                    exit 1
+                  fi
+
+            - name: Run tests from npm script
+              if: inputs.test-script != ''
               uses: $/actions/run-npm-script
               with:
                   npm-script: ${{ inputs.test-script }}
                   working-directory: ${{ inputs.working-directory }}
+
+            - name: Run test executable
+              if: inputs.test-executable != ''
+              working-directory: ${{ inputs.working-directory }}
+              shell: bash
+              env:
+                  TEST_EXECUTABLE: ${{ inputs.test-executable }}
+                  TEST_ARGUMENTS: ${{ inputs.test-arguments }}
+              run: |
+                  set -euo pipefail
+                  arguments=()
+                  if [[ -n "$TEST_ARGUMENTS" ]]; then
+                    read -r -a arguments <<< "$TEST_ARGUMENTS"
+                  fi
+                  "$TEST_EXECUTABLE" "${arguments[@]}"
 
             - name: Run lint
               if: inputs.lint-script != ''
@@ -176,6 +264,14 @@ jobs:
               uses: $/actions/run-npm-script
               with:
                   npm-script: ${{ inputs.lint-script }}
+                  working-directory: ${{ inputs.working-directory }}
+
+            - name: Generate SARIF
+              if: inputs.sarif-script != ''
+              continue-on-error: ${{ inputs.sarif-continue-on-error }}
+              uses: $/actions/run-npm-script
+              with:
+                  npm-script: ${{ inputs.sarif-script }}
                   working-directory: ${{ inputs.working-directory }}
 
             - name: Build project

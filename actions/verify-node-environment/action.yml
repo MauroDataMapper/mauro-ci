@@ -1,0 +1,66 @@
+name: Verify Node.js environment
+description: Verify installed tools and dependencies and optionally report linked packages
+
+inputs:
+    working-directory:
+        description: Directory containing the npm project
+        required: false
+        default: "."
+
+    tools:
+        description: Newline-separated local executables to report versions for
+        required: false
+        default: ""
+
+    dependencies:
+        description: Newline-separated npm dependencies to verify with npm ls
+        required: false
+        default: ""
+
+    report-symlinked-names:
+        description: Run the lockfile-installed symlinked CLI to report linked packages
+        required: false
+        default: "false"
+
+runs:
+    using: composite
+    steps:
+        - name: Verify installed tools, dependencies, and links
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          env:
+              TOOLS: ${{ inputs.tools }}
+              DEPENDENCIES: ${{ inputs.dependencies }}
+              REPORT_SYMLINKED_NAMES: ${{ inputs.report-symlinked-names }}
+          run: |
+              set -euo pipefail
+              if [[ "$REPORT_SYMLINKED_NAMES" != "true" && "$REPORT_SYMLINKED_NAMES" != "false" ]]; then
+                echo "report-symlinked-names must be true or false" >&2
+                exit 1
+              fi
+
+              while IFS= read -r tool; do
+                [[ -z "$tool" ]] && continue
+                if [[ ! "$tool" =~ ^[A-Za-z0-9._@/-]+$ ]]; then
+                  echo "Invalid tool name: $tool" >&2
+                  exit 1
+                fi
+                npx --no-install "$tool" --version
+              done <<< "$TOOLS"
+
+              dependencies=()
+              while IFS= read -r dependency; do
+                [[ -z "$dependency" ]] && continue
+                if [[ "$dependency" == -* ]]; then
+                  echo "Dependency names must not start with '-'" >&2
+                  exit 1
+                fi
+                dependencies+=("$dependency")
+              done <<< "$DEPENDENCIES"
+              if ((${#dependencies[@]} > 0)); then
+                npm ls "${dependencies[@]}"
+              fi
+
+              if [[ "$REPORT_SYMLINKED_NAMES" == "true" ]]; then
+                npx --no-install symlinked names
+              fi
