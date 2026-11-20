@@ -1,8 +1,8 @@
 # SECURITY:
 # This workflow intentionally uses workflow_run.
 # It does not checkout code or download artifacts from the triggering run.
-# It only reads workflow_run metadata and sends a Zulip notification.
-# It has no GITHUB_TOKEN permissions.
+# It reads workflow_run metadata and uses read-only API access to fetch the
+# commit message or pull request title before sending a Zulip notification.
 # Review carefully before adding any steps or dependencies.
 
 name: Security Check Notifications
@@ -29,6 +29,9 @@ jobs:
 
         runs-on: ubuntu-latest
         timeout-minutes: 5
+        permissions:
+            contents: read
+            pull-requests: read
 
         steps:
             - name: Send security notification via Zulip
@@ -52,9 +55,42 @@ jobs:
                   PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
                   HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name || github.repository }}
                   SERVER_URL: ${{ github.server_url }}
+                  API_URL: ${{ github.api_url }}
+                  GITHUB_TOKEN: ${{ github.token }}
 
               run: |
                   set -euo pipefail
+
+                  EVENT_DETAILS=""
+                  if [[ "$EVENT" == "push" ]]; then
+                    COMMIT_MESSAGE="$(curl \
+                      --fail-with-body \
+                      --silent \
+                      --show-error \
+                      --retry 3 \
+                      --connect-timeout 10 \
+                      --max-time 30 \
+                      --header "Accept: application/vnd.github+json" \
+                      --header "Authorization: Bearer $GITHUB_TOKEN" \
+                      --header "X-GitHub-Api-Version: 2022-11-28" \
+                      "$API_URL/repos/$REPOSITORY/commits/$COMMIT" |
+                      jq -r '.commit.message // empty')"
+                    EVENT_DETAILS="Commit message: $COMMIT_MESSAGE"
+                  elif [[ "$EVENT" == "pull_request" && -n "$PR_NUMBER" ]]; then
+                    PR_TITLE="$(curl \
+                      --fail-with-body \
+                      --silent \
+                      --show-error \
+                      --retry 3 \
+                      --connect-timeout 10 \
+                      --max-time 30 \
+                      --header "Accept: application/vnd.github+json" \
+                      --header "Authorization: Bearer $GITHUB_TOKEN" \
+                      --header "X-GitHub-Api-Version: 2022-11-28" \
+                      "$API_URL/repos/$REPOSITORY/pulls/$PR_NUMBER" |
+                      jq -r '.title // empty')"
+                    EVENT_DETAILS="Pull request: $PR_TITLE"
+                  fi
 
                   if [[ -n "$PR_NUMBER" ]]; then
                     SOURCE_LINK="[View pull request]($SERVER_URL/$REPOSITORY/pull/$PR_NUMBER)"
@@ -89,6 +125,7 @@ jobs:
                   MESSAGE="$STATUS **$REPOSITORY** ($WORKFLOW)
                   $BRANCH / $ACTOR ($EVENT)
                   ${COMMIT:0:12} (Attempt $ATTEMPT)
+                  $EVENT_DETAILS
                   [View workflow run]($RUN_URL)
                   $SOURCE_LINK"
                   
