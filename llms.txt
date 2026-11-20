@@ -27,6 +27,9 @@
 - [Setup Java and Gradle](actions/setup-gradle-java/action.yml)
 - [Link a local npm package](actions/link-npm-package/action.yml)
 - [Setup Node.js and npm](actions/setup-node-npm/action.yml)
+- [Run an npm script](actions/run-npm-script/action.yml)
+- [Check license headers](actions/check-license-headers/action.yml)
+- [Upload JUnit results](actions/upload-junit-results/action.yml)
 - [Setup Docker Buildx](actions/setup-docker-buildx/action.yml)
 - [Prepare MegaLinter](actions/prepare-megalinter/action.yml)
 

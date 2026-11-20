@@ -28,6 +28,9 @@ secrets, permissions, and behavior.
 | Run Node.js CI | `.github/workflows/node-ci.yml` | Runs `npm ci` and named npm scripts with no secrets and `contents: read`; report and build artifact paths are relative to the repository root. |
 | Set up Node.js in a custom job | `actions/setup-node-npm` | Configures Node.js/npm and installs the lockfile dependencies; use when a repository needs project-specific setup steps in the same job. |
 | Link a local npm dependency | `actions/link-npm-package` | Checks out and runs install/build scripts for a public dependency; use only in jobs without secrets. |
+| Run an npm script | `actions/run-npm-script` | Runs a named script after dependencies are installed; supports an optional single argument and working directory. Use for tests, license checks, lint, or builds. |
+| Check license headers | `actions/check-license-headers` | Runs a configurable npm license-check script; defaults to `license-check check`. |
+| Upload JUnit XML | `actions/upload-junit-results` | Uploads a JUnit file as an artifact and exposes its artifact ID; call with `if: always()` to upload after a failed test step. |
 | Publish Node.js artifacts | `.github/workflows/node-publish.yml` | Downloads an artifact without checking out or running repository code; publishes snapshots only on `main`/`develop` pushes and optional releases on `main`, using a required caller-configured environment for protection rules. |
 | Validate a Docker build | `.github/workflows/docker-build.yml` | Builds a multi-architecture image without publishing it. |
 | Publish to Docker Hub | `.github/workflows/docker-publish.yml` | Publishes only on pushes to `main`; pass Docker Hub credentials. |
@@ -67,6 +70,28 @@ steps:
   - uses: MauroDataMapper/mauro-ci/actions/setup-gradle-java@<ref>
     with:
       java-version: "17"
+```
+
+For Node.js projects, run scripts and upload JUnit results after setting up
+Node.js and installing dependencies:
+
+```yaml
+steps:
+  - uses: MauroDataMapper/mauro-ci/actions/run-npm-script@<ref>
+    with:
+      npm-script: test-with-coverage
+
+  - uses: MauroDataMapper/mauro-ci/actions/check-license-headers@<ref>
+    with:
+      license-script: license-check
+      license-argument: check
+
+  - if: always()
+    id: junit
+    uses: MauroDataMapper/mauro-ci/actions/upload-junit-results@<ref>
+    with:
+      artifact-name: unit-junit-results
+      path: test-report/junit.xml
 ```
 
 When reporting results, make the notification depend on the jobs whose

@@ -1,0 +1,39 @@
+name: Check license headers
+description: Run the configured npm license-header check
+
+inputs:
+    license-script:
+        description: npm script that checks license headers
+        required: false
+        default: license-check
+
+    license-argument:
+        description: Optional single argument for the license script
+        required: false
+        default: check
+
+    working-directory:
+        description: Directory containing the package.json
+        required: false
+        default: "."
+
+runs:
+    using: composite
+    steps:
+        - name: Check license headers
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          env:
+              LICENSE_SCRIPT: ${{ inputs.license-script }}
+              LICENSE_ARGUMENT: ${{ inputs.license-argument }}
+          run: |
+              set -euo pipefail
+              if [[ -z "$LICENSE_SCRIPT" ]]; then
+                echo "license-script must not be empty" >&2
+                exit 1
+              fi
+              if [[ -n "$LICENSE_ARGUMENT" ]]; then
+                npm run "$LICENSE_SCRIPT" -- "$LICENSE_ARGUMENT"
+              else
+                npm run "$LICENSE_SCRIPT"
+              fi

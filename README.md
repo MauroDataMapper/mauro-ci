@@ -39,6 +39,9 @@ support this repository's own workflow validation and security notifications.
 | `actions/setup-gradle-java` | Configures a Temurin JDK and Gradle. Accepts a Java version. |
 | `actions/link-npm-package` | Checks out a public npm package, installs/builds it, and links it into the consuming project. |
 | `actions/setup-node-npm` | Configures Node.js/npm, caches npm dependencies, and runs `npm ci` from a lockfile. |
+| `actions/run-npm-script` | Runs a named npm script with an optional single argument; use for tests, license checks, lint, or builds. |
+| `actions/check-license-headers` | Runs the configured npm license-header check, defaulting to `license-check check`. |
+| `actions/upload-junit-results` | Uploads JUnit XML as a workflow artifact and exposes its artifact ID. |
 | `actions/setup-docker-buildx` | Configures QEMU and Docker Buildx for multi-architecture builds. |
 | `actions/prepare-megalinter` | Copies the shared MegaLinter configuration into the consuming workspace. Supports the checked-in Groovy changed-files and full-repository configurations. |
 
@@ -107,6 +110,33 @@ a separate public npm package in that job,
 use `actions/link-npm-package` or set the corresponding `linked-package-*`
 inputs on `node-ci.yml`. The package's install and build scripts run as code;
 do not use this with secrets in the job.
+
+After dependencies are installed, `actions/run-npm-script` can run project
+scripts such as tests, license checks, lint, and builds. Set `npm-script`,
+optionally set one `argument`, and provide `working-directory` when the package
+is not at the workspace root. Use `actions/upload-junit-results` to upload
+JUnit XML; its `artifact-id` output can be used to guard a report job:
+
+```yaml
+- name: Check license headers
+  uses: MauroDataMapper/mauro-ci/actions/check-license-headers@<ref>
+  with:
+    license-script: license-check
+    license-argument: check
+
+- name: Run tests
+  uses: MauroDataMapper/mauro-ci/actions/run-npm-script@<ref>
+  with:
+    npm-script: test-with-coverage
+
+- name: Upload unit-test results
+  if: always()
+  id: upload-junit
+  uses: MauroDataMapper/mauro-ci/actions/upload-junit-results@<ref>
+  with:
+    artifact-name: unit-junit-results
+    path: test-report/junit.xml
+```
 
 The shared reporting and publishing workflows can consume the artifacts:
 

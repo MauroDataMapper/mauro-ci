@@ -158,58 +158,48 @@ jobs:
 
             - name: Run license check
               if: inputs.license-script != ''
-              working-directory: ${{ inputs.working-directory }}
-              env:
-                  NPM_SCRIPT: ${{ inputs.license-script }}
-                  NPM_ARGUMENT: ${{ inputs.license-argument }}
-              shell: bash
-              run: |
-                  if [[ -n "$NPM_ARGUMENT" ]]; then
-                    npm run "$NPM_SCRIPT" -- "$NPM_ARGUMENT"
-                  else
-                    npm run "$NPM_SCRIPT"
-                  fi
+              uses: $/actions/check-license-headers
+              with:
+                  license-script: ${{ inputs.license-script }}
+                  license-argument: ${{ inputs.license-argument }}
+                  working-directory: ${{ inputs.working-directory }}
 
             - name: Run tests
-              working-directory: ${{ inputs.working-directory }}
-              env:
-                  NPM_SCRIPT: ${{ inputs.test-script }}
-              run: npm run "$NPM_SCRIPT"
+              uses: $/actions/run-npm-script
+              with:
+                  npm-script: ${{ inputs.test-script }}
+                  working-directory: ${{ inputs.working-directory }}
 
             - name: Run lint
               if: inputs.lint-script != ''
               continue-on-error: ${{ inputs.lint-continue-on-error }}
-              working-directory: ${{ inputs.working-directory }}
-              env:
-                  NPM_SCRIPT: ${{ inputs.lint-script }}
-              run: npm run "$NPM_SCRIPT"
+              uses: $/actions/run-npm-script
+              with:
+                  npm-script: ${{ inputs.lint-script }}
+                  working-directory: ${{ inputs.working-directory }}
 
             - name: Build project
               if: inputs.build-script != ''
-              working-directory: ${{ inputs.working-directory }}
-              env:
-                  NPM_SCRIPT: ${{ inputs.build-script }}
-              run: npm run "$NPM_SCRIPT"
+              uses: $/actions/run-npm-script
+              with:
+                  npm-script: ${{ inputs.build-script }}
+                  working-directory: ${{ inputs.working-directory }}
 
             - name: Upload unit-test JUnit results
               id: upload-unit-junit
               if: always() && inputs.test-junit-path != ''
-              uses: actions/upload-artifact@v7.0.2
+              uses: $/actions/upload-junit-results
               with:
-                  name: unit-junit-results
+                  artifact-name: unit-junit-results
                   path: ${{ inputs.test-junit-path }}
-                  retention-days: 7
-                  if-no-files-found: warn
 
             - name: Upload lint JUnit results
               id: upload-lint-junit
               if: always() && inputs.lint-junit-path != ''
-              uses: actions/upload-artifact@v7.0.2
+              uses: $/actions/upload-junit-results
               with:
-                  name: lint-junit-results
+                  artifact-name: lint-junit-results
                   path: ${{ inputs.lint-junit-path }}
-                  retention-days: 7
-                  if-no-files-found: warn
 
             - name: Upload SARIF results
               id: upload-sarif

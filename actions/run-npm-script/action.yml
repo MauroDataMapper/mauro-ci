@@ -1,0 +1,38 @@
+name: Run npm script
+description: Run a named npm script with an optional single argument
+
+inputs:
+    npm-script:
+        description: Script name from package.json
+        required: true
+
+    argument:
+        description: Optional single argument passed to the npm script
+        required: false
+        default: ""
+
+    working-directory:
+        description: Directory containing the package.json
+        required: false
+        default: "."
+
+runs:
+    using: composite
+    steps:
+        - name: Run npm script
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          env:
+              NPM_SCRIPT: ${{ inputs.npm-script }}
+              NPM_ARGUMENT: ${{ inputs.argument }}
+          run: |
+              set -euo pipefail
+              if [[ -z "$NPM_SCRIPT" ]]; then
+                echo "npm-script must not be empty" >&2
+                exit 1
+              fi
+              if [[ -n "$NPM_ARGUMENT" ]]; then
+                npm run "$NPM_SCRIPT" -- "$NPM_ARGUMENT"
+              else
+                npm run "$NPM_SCRIPT"
+              fi
