@@ -7,10 +7,6 @@ on:
                 type: string
                 default: "24"
 
-            npm-version:
-                type: string
-                default: ""
-
             working-directory:
                 type: string
                 default: "."
@@ -145,7 +141,6 @@ jobs:
               uses: $/actions/setup-node-npm
               with:
                   node-version: ${{ inputs.node-version }}
-                  npm-version: ${{ inputs.npm-version }}
                   working-directory: ${{ inputs.working-directory }}
                   cache-dependency-path: ${{ inputs.cache-dependency-path }}
 

@@ -101,8 +101,9 @@ root. The workflow uploads test and lint reports as `unit-junit-results` and
 
 For projects that need custom setup between dependency installation and tests,
 use `actions/setup-node-npm` in a job of your own, then run the project-specific
-steps. It accepts `node-version`, optional `npm-version`, `working-directory`,
-and `cache-dependency-path`. To link a separate public npm package in that job,
+steps. It accepts `node-version`, `working-directory`, and
+`cache-dependency-path`, and uses the npm version bundled with Node.js. To link
+a separate public npm package in that job,
 use `actions/link-npm-package` or set the corresponding `linked-package-*`
 inputs on `node-ci.yml`. The package's install and build scripts run as code;
 do not use this with secrets in the job.
@@ -120,7 +121,6 @@ jobs:
     uses: MauroDataMapper/mauro-ci/.github/workflows/node-ci.yml@<ref>
     with:
       node-version: "24.16.0"
-      npm-version: "11.13.0"
       linked-package-repository: MauroDataMapper/mdm-resources
       linked-package-ref: refs/heads/develop
       linked-package-path: mdm-resources

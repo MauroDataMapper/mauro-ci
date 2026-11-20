@@ -7,11 +7,6 @@ inputs:
         required: false
         default: "24"
 
-    npm-version:
-        description: Optional npm version to install
-        required: false
-        default: ""
-
     working-directory:
         description: Directory containing the package lockfile
         required: false
@@ -31,13 +26,6 @@ runs:
               node-version: ${{ inputs.node-version }}
               cache: npm
               cache-dependency-path: ${{ inputs.cache-dependency-path }}
-
-        - name: Set up npm version
-          if: inputs.npm-version != ''
-          shell: bash
-          env:
-              NPM_VERSION: ${{ inputs.npm-version }}
-          run: npm install --global "npm@$NPM_VERSION"
 
         - name: Install dependencies
           shell: bash
