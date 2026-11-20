@@ -1,0 +1,133 @@
+name: Publish Node.js Artifacts
+
+on:
+    workflow_call:
+        inputs:
+            artifact-name:
+                description: Name of the artifact produced by a prior job
+                type: string
+                required: true
+
+            environment-name:
+                description: Consuming repository environment that protects publishing
+                type: string
+                required: true
+
+            artifact-pattern:
+                description: Filename glob to select files from the artifact
+                type: string
+                default: "*.tgz"
+
+            snapshot-url:
+                description: HTTPS base URL for snapshot uploads
+                type: string
+                required: true
+
+            release-url:
+                description: Optional HTTPS base URL for main-branch releases
+                type: string
+                default: ""
+
+        secrets:
+            REPOSITORY_USERNAME:
+                required: false
+            REPOSITORY_PASSWORD:
+                required: false
+
+permissions: {}
+
+jobs:
+    publish:
+        if: >-
+            github.event_name == 'push' &&
+            (github.ref == 'refs/heads/main' ||
+             github.ref == 'refs/heads/develop')
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        environment:
+            name: ${{ inputs.environment-name }}
+        permissions:
+            actions: read
+            contents: read
+
+        steps:
+            - name: Download build artifact
+              uses: actions/download-artifact@v7.0.0
+              with:
+                  name: ${{ inputs.artifact-name }}
+                  path: distribution
+
+            - name: Publish artifact files
+              shell: bash
+              env:
+                  ARTIFACT_PATTERN: ${{ inputs.artifact-pattern }}
+                  SNAPSHOT_URL: ${{ inputs.snapshot-url }}
+                  RELEASE_URL: ${{ inputs.release-url }}
+                  REPOSITORY_USERNAME: ${{ secrets.REPOSITORY_USERNAME }}
+                  REPOSITORY_PASSWORD: ${{ secrets.REPOSITORY_PASSWORD }}
+              run: |
+                  set -euo pipefail
+
+                  : "${REPOSITORY_USERNAME:?Missing REPOSITORY_USERNAME secret}"
+                  : "${REPOSITORY_PASSWORD:?Missing REPOSITORY_PASSWORD secret}"
+
+                  if [[ "$SNAPSHOT_URL" != https://* ]]; then
+                    echo "snapshot-url must use HTTPS" >&2
+                    exit 1
+                  fi
+                  if [[ "$GITHUB_REF" == "refs/heads/main" && -n "$RELEASE_URL" && "$RELEASE_URL" != https://* ]]; then
+                    echo "release-url must use HTTPS" >&2
+                    exit 1
+                  fi
+                  if [[ -z "$ARTIFACT_PATTERN" ]]; then
+                    echo "artifact-pattern must not be empty" >&2
+                    exit 1
+                  fi
+                  if [[ ! -d distribution ]]; then
+                    echo "Downloaded artifact directory is missing" >&2
+                    exit 1
+                  fi
+
+                  mapfile -d '' -t archives < <(find distribution -type f -name "$ARTIFACT_PATTERN" -print0)
+                  if ((${#archives[@]} == 0)); then
+                    echo "No files matched artifact-pattern" >&2
+                    exit 1
+                  fi
+
+                  for archive in "${archives[@]}"; do
+                    filename="$(basename "$archive")"
+                    if [[ ! "$filename" =~ ^[A-Za-z0-9._-]+$ ]]; then
+                      echo "Unsupported artifact filename: $filename" >&2
+                      exit 1
+                    fi
+
+                    echo "Publishing snapshot artifact $filename"
+                    curl \
+                      --fail-with-body \
+                      --silent \
+                      --show-error \
+                      --retry 3 \
+                      --connect-timeout 10 \
+                      --max-time 300 \
+                      --request PUT \
+                      --header "X-Generate-Checksums: true" \
+                      --user "$REPOSITORY_USERNAME:$REPOSITORY_PASSWORD" \
+                      --upload-file "$archive" \
+                      "${SNAPSHOT_URL%/}/$filename"
+
+                    if [[ "$GITHUB_REF" == "refs/heads/main" && -n "$RELEASE_URL" ]]; then
+                      echo "Publishing release artifact $filename"
+                      curl \
+                        --fail-with-body \
+                        --silent \
+                        --show-error \
+                        --retry 3 \
+                        --connect-timeout 10 \
+                        --max-time 300 \
+                        --request PUT \
+                        --header "X-Generate-Checksums: true" \
+                        --user "$REPOSITORY_USERNAME:$REPOSITORY_PASSWORD" \
+                        --upload-file "$archive" \
+                        "${RELEASE_URL%/}/$filename"
+                    fi
+                  done

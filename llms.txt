@@ -13,6 +13,8 @@
 
 - [Gradle test](.github/workflows/gradle-test.yml)
 - [Gradle publish](.github/workflows/gradle-publish.yml)
+- [Node.js CI](.github/workflows/node-ci.yml)
+- [Node.js artifact publishing](.github/workflows/node-publish.yml)
 - [Docker build validation](.github/workflows/docker-build.yml)
 - [Docker Hub publish](.github/workflows/docker-publish.yml)
 - [MegaLinter](.github/workflows/megalinter.yml)
@@ -23,6 +25,8 @@
 ## Composite actions
 
 - [Setup Java and Gradle](actions/setup-gradle-java/action.yml)
+- [Link a local npm package](actions/link-npm-package/action.yml)
+- [Setup Node.js and npm](actions/setup-node-npm/action.yml)
 - [Setup Docker Buildx](actions/setup-docker-buildx/action.yml)
 - [Prepare MegaLinter](actions/prepare-megalinter/action.yml)
 

@@ -1,0 +1,110 @@
+name: Link a local npm package
+description: Check out, build, and npm-link a public package into the current project
+
+inputs:
+    repository:
+        description: Public GitHub repository containing the package
+        required: true
+
+    ref:
+        description: Branch, tag, or commit to check out
+        required: true
+
+    path:
+        description: Workspace path for the checked-out package
+        required: true
+
+    package-name:
+        description: Name passed to npm link in the consuming project
+        required: true
+
+    working-directory:
+        description: Directory of the consuming npm project
+        required: false
+        default: "."
+
+    build-script:
+        description: Optional npm script to build the checked-out package
+        required: false
+        default: build
+
+    use-npm-ci:
+        description: Use npm ci rather than npm install for the checked-out package
+        required: false
+        default: "true"
+
+runs:
+    using: composite
+    steps:
+        - name: Validate package link inputs
+          shell: bash
+          env:
+              PACKAGE_REPOSITORY: ${{ inputs.repository }}
+              PACKAGE_REF: ${{ inputs.ref }}
+              PACKAGE_PATH: ${{ inputs.path }}
+              PACKAGE_NAME: ${{ inputs.package-name }}
+              USE_NPM_CI: ${{ inputs.use-npm-ci }}
+          run: |
+              set -euo pipefail
+              if [[ -z "$PACKAGE_REPOSITORY" || -z "$PACKAGE_REF" || -z "$PACKAGE_NAME" ]]; then
+                echo "repository, ref, and package-name must be non-empty" >&2
+                exit 1
+              fi
+              if [[ -z "$PACKAGE_PATH" || "$PACKAGE_PATH" == "." ||
+                    "$PACKAGE_PATH" == /* || "$PACKAGE_PATH" == *\\* ||
+                    "$PACKAGE_PATH" == *:* ||
+                    "$PACKAGE_PATH" == *$'\n'* || "$PACKAGE_PATH" == *$'\r'* ]]; then
+                echo "path must be a non-empty workspace-relative directory" >&2
+                exit 1
+              fi
+              IFS=/ read -r -a path_parts <<< "$PACKAGE_PATH"
+              for path_part in "${path_parts[@]}"; do
+                if [[ -z "$path_part" || "$path_part" == "." || "$path_part" == ".." ]]; then
+                  echo "path must not contain empty, current, or parent segments" >&2
+                  exit 1
+                fi
+              done
+              if [[ "$USE_NPM_CI" != "true" && "$USE_NPM_CI" != "false" ]]; then
+                echo "use-npm-ci must be true or false" >&2
+                exit 1
+              fi
+
+        - name: Checkout package
+          uses: actions/checkout@v7.0.1
+          with:
+              repository: ${{ inputs.repository }}
+              ref: ${{ inputs.ref }}
+              path: ${{ inputs.path }}
+              persist-credentials: false
+
+        - name: Install package dependencies with npm ci
+          if: inputs.use-npm-ci == 'true'
+          shell: bash
+          working-directory: ${{ inputs.path }}
+          run: npm ci
+
+        - name: Install package dependencies with npm install
+          if: inputs.use-npm-ci != 'true'
+          shell: bash
+          working-directory: ${{ inputs.path }}
+          run: npm install
+
+        - name: Build package
+          if: inputs.build-script != ''
+          shell: bash
+          working-directory: ${{ inputs.path }}
+          env:
+              NPM_SCRIPT: ${{ inputs.build-script }}
+          run: npm run "$NPM_SCRIPT"
+
+        - name: Link package globally
+          shell: bash
+          working-directory: ${{ inputs.path }}
+          run: npm link
+
+        - name: Link package into consuming project
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          env:
+              NPM_PACKAGE: ${{ inputs.package-name }}
+          run: npm link -- "$NPM_PACKAGE"

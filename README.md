@@ -20,11 +20,13 @@ Call these from a workflow in another repository using a job-level `uses`.
 | --- | --- |
 | `gradle-test.yml` | Sets up Java and Gradle, runs a Gradle task, and uploads JUnit results and failure diagnostics. |
 | `gradle-publish.yml` | Publishes snapshots from `develop` or Maven Central releases from `main`. Requires signing and repository credentials. |
+| `node-ci.yml` | Sets up Node.js, installs with `npm ci`, runs selected npm scripts, and uploads optional JUnit, SARIF, and build artifacts. |
+| `node-publish.yml` | Publishes a build artifact to an HTTPS snapshot URL on `main`/`develop` and optionally a release URL on `main`. |
 | `docker-build.yml` | Validates a multi-architecture Docker build without publishing it. |
 | `docker-publish.yml` | Publishes the Docker image to Docker Hub on pushes to `main`. Requires Docker Hub credentials. |
 | `megalinter.yml` | Prepares shared MegaLinter configuration, runs the configured lint workflow, and uploads reports. The checked-in configurations currently cover Groovy scans in changed-files or full-repository mode. The optional `scan-pr-commits` input enables Gitleaks PR commit-range scanning. |
 | `junit-report.yml` | Publishes a JUnit report from the `junit-results` artifact, subject to its event and repository checks. |
-| `sarif-upload.yml` | Uploads a MegaLinter SARIF artifact to GitHub code scanning on pushes to `main` or `develop`. |
+| `sarif-upload.yml` | Uploads a SARIF file from an artifact to GitHub code scanning on pushes to `main` or `develop`. |
 | `zulip-notify.yml` | Sends a compact Zulip message summarizing build, lint, Docker, and publishing results. Requires `ZULIP_API_KEY`. |
 
 `security-checks.yml`, `verify-actions-lock.yml`, and `security-notify.yml`
@@ -35,6 +37,8 @@ support this repository's own workflow validation and security notifications.
 | Action | Purpose |
 | --- | --- |
 | `actions/setup-gradle-java` | Configures a Temurin JDK and Gradle. Accepts a Java version. |
+| `actions/link-npm-package` | Checks out a public npm package, installs/builds it, and links it into the consuming project. |
+| `actions/setup-node-npm` | Configures Node.js/npm, caches npm dependencies, and runs `npm ci` from a lockfile. |
 | `actions/setup-docker-buildx` | Configures QEMU and Docker Buildx for multi-architecture builds. |
 | `actions/prepare-megalinter` | Copies the shared MegaLinter configuration into the consuming workspace. Supports the checked-in Groovy changed-files and full-repository configurations. |
 
@@ -73,7 +77,8 @@ Inputs and required secrets are declared under each workflow's `workflow_call`
 section. For example, `gradle-publish.yml` requires signing and repository
 secrets, while `docker-publish.yml` requires Docker Hub credentials. Configure
 these in the consuming repository or its GitHub environment, then pass only
-the secrets needed by the called workflow.
+the secrets needed by the called workflow. `node-publish.yml` binds its job to
+a named environment so consumers can enforce approvals and branch restrictions.
 
 To use a composite action, call it from a step in a job after checking out the
 consuming repository:
@@ -83,6 +88,119 @@ consuming repository:
   with:
     java-version: "17"
 ```
+
+## Node.js projects
+
+`node-ci.yml` checks out the consuming repository with checkout credentials
+disabled, grants only `contents: read`, and runs `npm ci` without secrets. Set
+`test-script` to a script in `package.json`; lint, license, and build scripts
+are optional. Report and build artifact paths are relative to the repository
+root. The workflow uploads test and lint reports as `unit-junit-results` and
+`lint-junit-results`, SARIF as `sarif-results`, and the build output under
+`build-artifact-name` (default `node-build`).
+
+For projects that need custom setup between dependency installation and tests,
+use `actions/setup-node-npm` in a job of your own, then run the project-specific
+steps. It accepts `node-version`, optional `npm-version`, `working-directory`,
+and `cache-dependency-path`. To link a separate public npm package in that job,
+use `actions/link-npm-package` or set the corresponding `linked-package-*`
+inputs on `node-ci.yml`. The package's install and build scripts run as code;
+do not use this with secrets in the job.
+
+The shared reporting and publishing workflows can consume the artifacts:
+
+```yaml
+permissions:
+  contents: read
+
+jobs:
+  node-ci:
+    permissions:
+      contents: read
+    uses: MauroDataMapper/mauro-ci/.github/workflows/node-ci.yml@<ref>
+    with:
+      node-version: "24.16.0"
+      npm-version: "11.13.0"
+      linked-package-repository: MauroDataMapper/mdm-resources
+      linked-package-ref: refs/heads/develop
+      linked-package-path: mdm-resources
+      linked-package-name: "@maurodatamapper/mdm-resources"
+      linked-package-use-npm-ci: false
+      test-script: test-with-coverage
+      lint-script: eslint-nofix
+      lint-continue-on-error: true
+      build-script: dist
+      test-junit-path: test-report/junit.xml
+      lint-junit-path: eslint/eslint-junit.xml
+      sarif-path: eslint/eslint_report.sarif
+      build-artifact-path: dist/*.tgz
+      build-artifact-name: package-distribution
+
+  unit-test-report:
+    needs: node-ci
+    if: >-
+      always() &&
+      needs.node-ci.outputs.unit-junit-artifact-id != '' &&
+      ((github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository) ||
+       (github.event_name == 'push' &&
+        (github.ref == 'refs/heads/main' ||
+         github.ref == 'refs/heads/develop')))
+    permissions:
+      actions: read
+      checks: write
+      contents: read
+    uses: MauroDataMapper/mauro-ci/.github/workflows/junit-report.yml@<ref>
+    with:
+      artifact-name: unit-junit-results
+      report-name: Unit Test Results
+
+  sarif:
+    needs: node-ci
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' ||
+       github.ref == 'refs/heads/develop') &&
+      needs.node-ci.outputs.sarif-artifact-id != ''
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: MauroDataMapper/mauro-ci/.github/workflows/sarif-upload.yml@<ref>
+    with:
+      artifact-name: sarif-results
+      sarif-path: eslint_report.sarif
+      category: ESLint
+
+  publish:
+    needs: node-ci
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' ||
+       github.ref == 'refs/heads/develop')
+    permissions:
+      actions: read
+      contents: read
+    uses: MauroDataMapper/mauro-ci/.github/workflows/node-publish.yml@<ref>
+    with:
+      artifact-name: package-distribution
+      environment-name: npm-publish
+      snapshot-url: https://repository.example/snapshots/my-package
+      release-url: https://repository.example/releases/my-package
+```
+
+Configure the consuming repository's `npm-publish` environment with the
+required reviewers or other protection rules you need, and add
+`REPOSITORY_USERNAME` and `REPOSITORY_PASSWORD` as environment secrets. The
+workflow can also use repository-level secrets if they are explicitly mapped
+under `secrets` in the caller instead.
+
+`node-publish.yml` never checks out or executes package code. It publishes only
+on pushes to `main` or `develop`, always uploads matching files to the
+snapshot URL, and uploads to the optional release URL only on `main`. Keep the
+caller condition and the environment's protection rules; do not pass publishing
+secrets to PR jobs. `sarif-upload.yml` defaults to MegaLinter's artifact path,
+or can accept another artifact-relative `sarif-path`.
 
 ## Notifications and reports
 

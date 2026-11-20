@@ -8,6 +8,11 @@ on:
                 type: string
                 default: megalinter-reports
 
+            sarif-path:
+                description: SARIF file path relative to the downloaded artifact
+                type: string
+                default: megalinter-reports/megalinter-report.sarif
+
             category:
                 description: Code scanning category
                 type: string
@@ -31,20 +36,41 @@ jobs:
             security-events: write
 
         steps:
-            - name: Download MegaLinter artifact
+            - name: Download SARIF artifact
               uses: actions/download-artifact@v8.0.2
               with:
                   name: ${{ inputs.artifact-name }}
                   path: reports
 
             - name: Verify SARIF exists
+              id: verify-sarif
               shell: bash
+              env:
+                  SARIF_PATH: ${{ inputs.sarif-path }}
               run: |
-                  test -s reports/megalinter-reports/megalinter-report.sarif
+                  set -euo pipefail
+                  if [[ "$SARIF_PATH" == *$'\n'* || "$SARIF_PATH" == *$'\r'* ]]; then
+                    echo "sarif-path must not contain newlines" >&2
+                    exit 1
+                  fi
+                  reports_directory="$(realpath reports)"
+                  sarif_file="$(realpath -e "reports/$SARIF_PATH")"
+                  case "$sarif_file" in
+                    "$reports_directory"/*) ;;
+                    *)
+                      echo "sarif-path must point inside the downloaded artifact" >&2
+                      exit 1
+                      ;;
+                  esac
+                  if [[ ! -f "$sarif_file" || ! -s "$sarif_file" ]]; then
+                    echo "SARIF file is missing or empty: $SARIF_PATH" >&2
+                    exit 1
+                  fi
+                  printf 'sarif-file=%s\n' "$sarif_file" >> "$GITHUB_OUTPUT"
 
             - name: Upload SARIF to GitHub
               uses: github/codeql-action/upload-sarif@v4.39.3
               with:
-                  sarif_file: reports/megalinter-reports/megalinter-report.sarif
+                  sarif_file: ${{ steps.verify-sarif.outputs.sarif-file }}
                   category: ${{ inputs.category }}
                   wait-for-processing: true
