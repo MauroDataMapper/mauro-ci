@@ -34,7 +34,7 @@ secrets, permissions, and behavior.
 | Lint with MegaLinter | `.github/workflows/megalinter.yml` | The checked-in workflow/configuration supports Groovy. `scan-mode` is `changed` by default or can be `full`; it uploads `megalinter-reports`. Set `scan-pr-commits: true` to enable Gitleaks scanning between PR base and head commits. |
 | Publish JUnit results | `.github/workflows/junit-report.yml` | Expects the `junit-results` artifact and only runs for same-repository pull requests or pushes to `main`/`develop`. |
 | Upload SARIF | `.github/workflows/sarif-upload.yml` | Expects `megalinter-reports` by default, accepts another artifact and relative file path, and only uploads on pushes to `main`/`develop`. |
-| Send a Zulip summary | `.github/workflows/zulip-notify.yml` | Pass job results and `ZULIP_API_KEY`; use `if: always()` if it must run after failed or cancelled jobs. |
+| Send a Zulip summary | `.github/workflows/zulip-notify.yml` | Pass job results and `ZULIP_API_KEY`; push notifications include the commit message and PR notifications include the PR title. Use `if: always()` if it must run after failed or cancelled jobs. |
 | Configure Java and Gradle | `actions/setup-gradle-java` | Composite action; use it as a step and provide `java-version` if the default is unsuitable. |
 | Configure Node.js/npm | `actions/setup-node-npm` | Composite action; requires a lockfile and runs `npm ci`. |
 | Link a public npm dependency | `actions/link-npm-package` | Composite action; runs package installation/build scripts and links the package into the current project. |

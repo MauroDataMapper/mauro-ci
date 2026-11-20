@@ -27,7 +27,7 @@ Call these from a workflow in another repository using a job-level `uses`.
 | `megalinter.yml` | Prepares shared MegaLinter configuration, runs the configured lint workflow, and uploads reports. The checked-in configurations currently cover Groovy scans in changed-files or full-repository mode. The optional `scan-pr-commits` input enables Gitleaks PR commit-range scanning. |
 | `junit-report.yml` | Publishes a JUnit report from the `junit-results` artifact, subject to its event and repository checks. |
 | `sarif-upload.yml` | Uploads a SARIF file from an artifact to GitHub code scanning on pushes to `main` or `develop`. |
-| `zulip-notify.yml` | Sends a compact Zulip message summarizing build, lint, Docker, and publishing results. Requires `ZULIP_API_KEY`. |
+| `zulip-notify.yml` | Sends a compact Zulip message summarizing build, lint, Docker, and publishing results; includes the commit message on pushes and PR title when available. Requires `ZULIP_API_KEY`. |
 
 `security-checks.yml`, `verify-actions-lock.yml`, and `security-notify.yml`
 support this repository's own workflow validation and security notifications.
@@ -206,7 +206,8 @@ or can accept another artifact-relative `sarif-path`.
 
 The Zulip reusable workflow accepts job results as string inputs. When calling
 it to report jobs that may fail or be cancelled, use `if: always()` and pass
-their results through `needs`:
+their results through `needs`. Push notifications also include the push
+commit's message, while pull request notifications include the PR title:
 
 ```yaml
   notify:
