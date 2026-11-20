@@ -1,0 +1,232 @@
+name: Node.js CI
+
+on:
+    workflow_call:
+        inputs:
+            node-version:
+                type: string
+                default: "24"
+
+            working-directory:
+                type: string
+                default: "."
+
+            cache-dependency-path:
+                type: string
+                default: package-lock.json
+
+            linked-package-repository:
+                description: Optional public GitHub repository for an npm package to link
+                type: string
+                default: ""
+
+            linked-package-ref:
+                description: Branch, tag, or commit to check out for the linked package
+                type: string
+                default: ""
+
+            linked-package-path:
+                description: Workspace path for the checked-out linked package
+                type: string
+                default: linked-package
+
+            linked-package-name:
+                description: npm package name to link into the consuming project
+                type: string
+                default: ""
+
+            linked-package-build-script:
+                description: Optional npm build script for the linked package
+                type: string
+                default: build
+
+            linked-package-use-npm-ci:
+                description: Use npm ci rather than npm install for the linked package
+                type: boolean
+                default: true
+
+            license-script:
+                description: Optional npm script to run before tests
+                type: string
+                default: ""
+
+            license-argument:
+                description: Optional single argument for the license script
+                type: string
+                default: ""
+
+            test-script:
+                description: npm script to run for tests
+                type: string
+                required: true
+
+            lint-script:
+                description: Optional npm script to run for linting
+                type: string
+                default: ""
+
+            lint-continue-on-error:
+                description: Keep the workflow successful when the lint script fails
+                type: boolean
+                default: false
+
+            build-script:
+                description: Optional npm script to build the project
+                type: string
+                default: ""
+
+            test-junit-path:
+                description: Optional JUnit XML path relative to the repository root
+                type: string
+                default: ""
+
+            lint-junit-path:
+                description: Optional lint JUnit XML path relative to the repository root
+                type: string
+                default: ""
+
+            sarif-path:
+                description: Optional SARIF path relative to the repository root
+                type: string
+                default: ""
+
+            build-artifact-path:
+                description: Optional build output path relative to the repository root
+                type: string
+                default: ""
+
+            build-artifact-name:
+                description: Name for the uploaded build artifact
+                type: string
+                default: node-build
+
+        outputs:
+            unit-junit-artifact-id:
+                description: Uploaded unit-test JUnit artifact ID, if present
+                value: ${{ jobs.ci.outputs.unit-junit-artifact-id }}
+
+            lint-junit-artifact-id:
+                description: Uploaded lint JUnit artifact ID, if present
+                value: ${{ jobs.ci.outputs.lint-junit-artifact-id }}
+
+            sarif-artifact-id:
+                description: Uploaded SARIF artifact ID, if present
+                value: ${{ jobs.ci.outputs.sarif-artifact-id }}
+
+            build-artifact-id:
+                description: Uploaded build artifact ID, if present
+                value: ${{ jobs.ci.outputs.build-artifact-id }}
+
+permissions: {}
+
+jobs:
+    ci:
+        runs-on: ubuntu-latest
+        timeout-minutes: 60
+        permissions:
+            contents: read
+        outputs:
+            unit-junit-artifact-id: ${{ steps.upload-unit-junit.outputs.artifact-id }}
+            lint-junit-artifact-id: ${{ steps.upload-lint-junit.outputs.artifact-id }}
+            sarif-artifact-id: ${{ steps.upload-sarif.outputs.artifact-id }}
+            build-artifact-id: ${{ steps.upload-build.outputs.artifact-id }}
+
+        steps:
+            - name: Checkout consuming repository
+              uses: actions/checkout@v7.0.1
+              with:
+                  persist-credentials: false
+
+            - name: Set up Node.js and install dependencies
+              uses: $/actions/setup-node-npm
+              with:
+                  node-version: ${{ inputs.node-version }}
+                  working-directory: ${{ inputs.working-directory }}
+                  cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+            - name: Link local npm package
+              if: inputs.linked-package-repository != ''
+              uses: $/actions/link-npm-package
+              with:
+                  repository: ${{ inputs.linked-package-repository }}
+                  ref: ${{ inputs.linked-package-ref }}
+                  path: ${{ inputs.linked-package-path }}
+                  package-name: ${{ inputs.linked-package-name }}
+                  working-directory: ${{ inputs.working-directory }}
+                  build-script: ${{ inputs.linked-package-build-script }}
+                  use-npm-ci: ${{ inputs.linked-package-use-npm-ci }}
+
+            - name: Run license check
+              if: inputs.license-script != ''
+              working-directory: ${{ inputs.working-directory }}
+              env:
+                  NPM_SCRIPT: ${{ inputs.license-script }}
+                  NPM_ARGUMENT: ${{ inputs.license-argument }}
+              shell: bash
+              run: |
+                  if [[ -n "$NPM_ARGUMENT" ]]; then
+                    npm run "$NPM_SCRIPT" -- "$NPM_ARGUMENT"
+                  else
+                    npm run "$NPM_SCRIPT"
+                  fi
+
+            - name: Run tests
+              working-directory: ${{ inputs.working-directory }}
+              env:
+                  NPM_SCRIPT: ${{ inputs.test-script }}
+              run: npm run "$NPM_SCRIPT"
+
+            - name: Run lint
+              if: inputs.lint-script != ''
+              continue-on-error: ${{ inputs.lint-continue-on-error }}
+              working-directory: ${{ inputs.working-directory }}
+              env:
+                  NPM_SCRIPT: ${{ inputs.lint-script }}
+              run: npm run "$NPM_SCRIPT"
+
+            - name: Build project
+              if: inputs.build-script != ''
+              working-directory: ${{ inputs.working-directory }}
+              env:
+                  NPM_SCRIPT: ${{ inputs.build-script }}
+              run: npm run "$NPM_SCRIPT"
+
+            - name: Upload unit-test JUnit results
+              id: upload-unit-junit
+              if: always() && inputs.test-junit-path != ''
+              uses: actions/upload-artifact@v7.0.2
+              with:
+                  name: unit-junit-results
+                  path: ${{ inputs.test-junit-path }}
+                  retention-days: 7
+                  if-no-files-found: warn
+
+            - name: Upload lint JUnit results
+              id: upload-lint-junit
+              if: always() && inputs.lint-junit-path != ''
+              uses: actions/upload-artifact@v7.0.2
+              with:
+                  name: lint-junit-results
+                  path: ${{ inputs.lint-junit-path }}
+                  retention-days: 7
+                  if-no-files-found: warn
+
+            - name: Upload SARIF results
+              id: upload-sarif
+              if: always() && inputs.sarif-path != ''
+              uses: actions/upload-artifact@v7.0.2
+              with:
+                  name: sarif-results
+                  path: ${{ inputs.sarif-path }}
+                  retention-days: 7
+                  if-no-files-found: warn
+
+            - name: Upload build artifact
+              id: upload-build
+              if: success() && inputs.build-artifact-path != ''
+              uses: actions/upload-artifact@v7.0.2
+              with:
+                  name: ${{ inputs.build-artifact-name }}
+                  path: ${{ inputs.build-artifact-path }}
+                  retention-days: 7
+                  if-no-files-found: error
